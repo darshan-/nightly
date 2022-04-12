@@ -23,14 +23,11 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.service.notification.StatusBarNotification;
+import android.view.inputmethod.InputMethodManager;
+import android.view.MotionEvent;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import android.webkit.CookieManager;
-import android.webkit.JavascriptInterface;
-import android.webkit.WebResourceResponse;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.EditText;
 import android.widget.Toast;
 
@@ -49,6 +46,8 @@ import java.util.HashMap;
 public class MainActivity extends Activity {
     private SharedPreferences prefs;
     private static final String PREFS_FILE = "ma_settings";
+    private boolean lastMEWasDown = false;
+    private float lastX, lastY;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,8 +62,74 @@ public class MainActivity extends Activity {
             w.setStatusBarColor(0xff000000);
         }
 
-        EditText editText = (EditText ) findViewById(R.id.editor);
+        EditText editText = (EditText) findViewById(R.id.editor);
         editText.requestFocus();
+
+        findViewById(R.id.sv).setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View view, MotionEvent e) {
+                //EditText editText = (EditText) findViewById(R.id.editor);
+                //if (editText != null)
+                //editText.setText("YOYO");
+                //editText.requestFocusFromTouch();
+
+                /*
+
+                  Okay, let's actually look at the MotionEvent --
+                  I guess like swapadoodle, keep track of last event.
+                  If last event was down, and this is up, then show keyboard and return true.
+                  Otherwise don't do anything and return false.
+
+                  lastMEWasDown
+
+                  (maybe always return false?  Certainly we don't want to open keyboad if scrolling, though,
+                    so definitely want to keep track of down/up)
+
+                 */
+
+                int a = e.getActionMasked();
+
+                String s = "";
+                //editText.setText("action: " + a);
+                if (a == MotionEvent.ACTION_DOWN) s += "D: ";
+                if (a == MotionEvent.ACTION_MOVE) s += "M: ";
+                if (a == MotionEvent.ACTION_UP) s += "U: ";
+                s += e.getX() + ", " + e.getY();
+                //editText.setText(s);
+                //editText.append(s + "\n");
+
+                if (a == MotionEvent.ACTION_DOWN) {
+                    lastMEWasDown = true;
+                    lastX = e.getX();
+                    lastY = e.getY();
+                    return false;
+                }
+
+                if (a == MotionEvent.ACTION_UP && lastMEWasDown) {
+                    InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                    imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
+                }
+
+                if (a == MotionEvent.ACTION_MOVE && lastMEWasDown) {
+                    if (lastX - e.getX() < 6 &&
+                        lastY - e.getY() < 6 &&
+                        e.getX() - lastX < 6 &&
+                        e.getY() - lastY < 6) return false;
+                }
+
+                lastMEWasDown = false;
+                return false;
+            }
+
+        });
+        // findViewById(R.id.sv).setOnClickListener(new View.OnClickListener() {
+        //     @Override
+        //     public void onClick(View view) {
+        //         //EditText editText = (EditText ) findViewById(R.id.editor);
+        //         //if (editText != null)
+        //         editText.setText("rara");
+        //     }
+        // });
     }
 
     @Override
@@ -101,4 +166,11 @@ public class MainActivity extends Activity {
     //         //super.onBackPressed(); // This instead of finish()?
     //     }
     // }
+
+    public void svClick(android.view.View v) {
+        //EditText editText = (EditText ) findViewById(R.id.editor);
+        //if (editText != null)
+            //editText.setText("test");
+            //editText.requestFocus();
+    }
 }
