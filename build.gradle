@@ -1,0 +1,82 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        google()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:4.2.0'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            url "https://maven.google.com" // Google's Maven repository
+        }
+    }
+
+    //gradle.projectsEvaluated {
+    //    tasks.withType(JavaCompile) {
+    //        options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+    //    }
+    //}
+}
+
+apply plugin: 'com.android.application'
+
+Properties secureProperties = new Properties()
+secureProperties.load(new FileInputStream("secure.properties"))
+
+android {
+    compileSdkVersion 30
+    //buildToolsVersion "27.0.3" // With Android plugin 3.0.0+, automatically uses latest now
+
+    defaultConfig {
+        minSdkVersion 19
+        targetSdkVersion 30
+
+        resConfigs "en"
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDirs = ['src']
+            resources.srcDirs = ['src']
+            aidl.srcDirs = ['src']
+            renderscript.srcDirs = ['src']
+            res.srcDirs = ['res']
+            assets.srcDirs = ['assets']
+        }
+    }
+
+    lintOptions {
+        disable 'MissingTranslation'
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("../../android/BI_on_googlecode.com/private/my-release-key.keystore")
+            storePassword secureProperties['key.store.password']
+            keyAlias "alias_name"
+            keyPassword secureProperties['key.alias.password']
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            //minifyEnabled true   // Only enable on actual release builds
+            // shrinkResources true // Only enable on actual release builds
+            //proguardFile getDefaultProguardFile('proguard-android.txt')
+            //proguardFile getDefaultProguardFile('proguard-android-optimize.txt')
+        }
+    }
+}
+
+dependencies {
+}
+

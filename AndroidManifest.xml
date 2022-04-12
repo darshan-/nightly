@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.darshancomputing.nightly"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:versionCode="0"
+    android:versionName="0.0.1-dev"
+>
+  <application
+      android:label="Nightly"
+      android:hardwareAccelerated="true"
+      android:allowBackup="false"
+      android:resizeableActivity="true"
+      android:theme="@style/black_material_no_action_bar"
+  >
+    <!--
+      android:theme="@android:style/Theme.Material.NoActionBar"
+      android:theme="@android:style/Theme.Black.NoTitleBar"
+      android:theme="@style/my_theme"
+        Temporarily put these two lines in <application> above to enable debugging of release build:
+
+        android:debuggable="true"
+        tools:ignore="HardcodedDebugMode"
+    -->
+    <activity
+        android:name=".MainActivity"
+        android:label="Nightly"
+        android:launchMode="singleTask"
+        android:screenOrientation="portrait"
+        android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|fontScale|keyboard|keyboardHidden|layoutDirection|locale|mcc|mnc|navigation|touchscreen|uiMode"
+    >
+      <intent-filter android:label="Nightly">
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+        <category android:name="android.intent.category.DEFAULT" />
+      </intent-filter>
+
+    </activity>
+
+  </application>
+
+  <uses-feature android:name="android.hardware.touchscreen" android:required="true" />
+
+  <supports-screens
+      android:smallScreens="true"
+      android:normalScreens="true"
+      android:largeScreens="true"
+      android:anyDensity="true"
+  />
+</manifest>
