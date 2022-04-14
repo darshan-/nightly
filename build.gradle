@@ -35,8 +35,10 @@ android {
     //buildToolsVersion "27.0.3" // With Android plugin 3.0.0+, automatically uses latest now
 
     defaultConfig {
-        minSdkVersion 19
-        targetSdkVersion 30
+        //minSdkVersion 23
+        //targetSdkVersion 30
+        minSdkVersion 23
+        targetSdkVersion 18
 
         resConfigs "en"
     }
@@ -55,6 +57,7 @@ android {
 
     lintOptions {
         disable 'MissingTranslation'
+        checkReleaseBuilds false
     }
 
     signingConfigs {

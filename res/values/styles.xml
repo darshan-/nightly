@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <color name="accent">#9867b1</color>
+
   <style
       name="black_material_no_action_bar"
       parent="@android:style/Theme.Material.NoActionBar"
   >
     <item name="android:colorBackground">#000</item>
+
+    <!--item name="android:textSelectHandle">@color/accent</item-->
+    <item name="android:colorAccent">@color/accent</item>
+    <!--item name="colorAccent">@color/accent</item-->
   </style>
 </resources>
