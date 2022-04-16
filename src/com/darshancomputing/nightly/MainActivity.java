@@ -66,10 +66,15 @@ import java.util.List;
 //  As long as I'm running a rooted device, I can still adb shell, su, copy to /sdcard/, then pull.
 
 public class MainActivity extends Activity {
-    private static final String PREFS_FILE = "settings";
+    private static final String PREFS = "settings";
     private static final String FILE = "nightly.txt";
+    private static final String STASH = FILE + "~" ;
+
+    private static final String PREF_CUR_POS = "cur_pos";
+    private static final String PREF_MODIFIED = "modified";
 
     private SharedPreferences prefs;
+    private SharedPreferences.Editor editor;
     private boolean lastMEWasDown = false;
     private float lastX, lastY;
     private EditText editText;
@@ -78,7 +83,6 @@ public class MainActivity extends Activity {
 
     private void setModified() {
         modified = true;
-        //header.setText("* Nightly");
         header.setText(android.text.Html.fromHtml("<font face=\"monospace\">*</font> Nightly"));
     }
 
@@ -91,6 +95,9 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        prefs = getSharedPreferences(PREFS, 0);
+        editor = prefs.edit();
+
         setContentView(R.layout.main_activity);
 
         Window w = getWindow();
@@ -102,7 +109,6 @@ public class MainActivity extends Activity {
         editText.requestFocus();
 
         header = (TextView) findViewById(R.id.header);
-        setUnmodified();
 
         editText.addTextChangedListener(new TextWatcher () {
             @Override
@@ -146,55 +152,27 @@ public class MainActivity extends Activity {
 
         });
 
-        loadFile();
-    }
+        if (prefs.getBoolean(PREF_MODIFIED, false)) {
+            restoreStashedBuffer();
+            setModified();
+        } else {
+            loadFile();
+        }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
+        int pos = prefs.getInt(PREF_CUR_POS, 0);
+        editText.setSelection(pos);
     }
 
     @Override
     public void onPause() {
         super.onPause();
 
-        if (modified) {
-            // Safe buffer, either as its own file, or some other way, so we can restore
-            // We want to keep cursor position, that modified is set, etc.
-            // Best to do with bundle instance state stuff?
-        }
-    }
+        editor.putBoolean(PREF_MODIFIED, modified);
+        editor.putInt(PREF_CUR_POS, editText.getSelectionStart());
+        editor.apply();
 
-    // @Override
-    // public void onBackPressed() {
-    //     // Protects against navigation, so before goBack and onBackPressed, but after other things
-    //     if (protectedBack) {
-    //         // TODO: Show UI about losing changes?  Cancel means return from method; continue means goBack/oBP
-    //         if (wv.canGoBack()) {
-    //             wv.goBack();
-    //         } else {
-    //             //Toast.makeText(this, "Unsent doodle!", Toast.LENGTH_SHORT).show();
-    //             moveTaskToBack(true);
-    //         }
-    //     } else {
-    //         if (wv.canGoBack())
-    //             wv.goBack();
-    //         else
-    //             finish();
-    //         //super.onBackPressed(); // This instead of finish()?
-    //     }
-    // }
-
-    public void svClick(android.view.View v) {
-        //EditText editText = (EditText ) findViewById(R.id.editor);
-        //if (editText != null)
-            //editText.setText("test");
-            //editText.requestFocus();
+        if (modified)
+            stashBuffer();
     }
 
     public void hClick(android.view.View v) {
@@ -202,10 +180,33 @@ public class MainActivity extends Activity {
     }
 
     private void saveFile() {
+        saveFile(FILE);
+        setUnmodified();
+    }
+
+    private void loadFile() {
+        loadFile(FILE);
+        setUnmodified();
+    }
+
+    private void stashBuffer() {
+        saveFile(STASH);
+    }
+
+    private void restoreStashedBuffer() {
+        loadFile(STASH);
+        removeStashFile();
+    }
+
+    private void removeStashFile() {
+        File f = new File(getFilesDir(), STASH);
+        f.delete();
+    }
+
+    private void saveFile(String fname) {
         try {
-            FileOutputStream fos = openFileOutput(FILE, 0);
+            FileOutputStream fos = openFileOutput(fname, 0);
             fos.write(editText.getText().toString().getBytes());
-            setUnmodified();
         } catch (FileNotFoundException e) {
             Toast.makeText(this, "File not found!", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
@@ -213,9 +214,9 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void loadFile() {
+    private void loadFile(String fname) {
         try {
-            FileInputStream fis = openFileInput(FILE);
+            FileInputStream fis = openFileInput(fname);
             ByteArrayOutputStream result = new ByteArrayOutputStream();
             byte[] buf = new byte[1024];
             int len;
@@ -227,7 +228,6 @@ public class MainActivity extends Activity {
             editText.setText(s);
             editText.setSelection(s.length());
             editText.requestFocus();
-            setUnmodified();
         } catch (FileNotFoundException e) {
             //Toast.makeText(this, "File not found!", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {

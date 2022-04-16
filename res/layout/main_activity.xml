@@ -36,7 +36,6 @@
         android:typeface="monospace"
         android:textSize="20dp"
         android:textCursorDrawable="@drawable/cursor"
-        android:onClick="svClick"
     />
   </ScrollView>
 </LinearLayout>
