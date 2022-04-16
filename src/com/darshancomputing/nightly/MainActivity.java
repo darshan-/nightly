@@ -31,6 +31,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.EditText;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -47,6 +48,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.Runnable;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
@@ -54,23 +56,13 @@ import java.util.HashMap;
 import java.util.List;
 
 
-
-// I guess the "right" way to do it is like Signal, with the storage framework -- have user manually
-//   pick a folder.  Then the app can handle the rest?
-// Other two options are targeting API level 18, as I've done for now, or requesting root.  I don't think
-//   there are any other options, as having the file removed if the app is uninstalled is super revolting to me.
-// I just want it to be simply, but the prompt asking for storage permissions and then another complaining about
-//   targeting an old API level makes it kinda clunky anyway...
-
-// Context.getFilesDir() to just use always-available, internal storage, and have cloud be source of truth...
-//  As long as I'm running a rooted device, I can still adb shell, su, copy to /sdcard/, then pull.
-
 public class MainActivity extends Activity {
     private static final String PREFS = "settings";
     private static final String FILE = "nightly.txt";
     private static final String STASH = FILE + "~" ;
 
     private static final String PREF_CUR_POS = "cur_pos";
+    private static final String PREF_SCROLL_Y = "scroll_y";
     private static final String PREF_MODIFIED = "modified";
 
     private SharedPreferences prefs;
@@ -79,6 +71,7 @@ public class MainActivity extends Activity {
     private float lastX, lastY;
     private EditText editText;
     private TextView header;
+    private ScrollView sv;
     private boolean modified;
 
     private void setModified() {
@@ -121,7 +114,8 @@ public class MainActivity extends Activity {
             public void onTextChanged(CharSequence s, int start, int before, int count){}
         });
 
-        findViewById(R.id.sv).setOnTouchListener(new View.OnTouchListener() {
+        sv = findViewById(R.id.sv);
+        sv.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View view, MotionEvent e) {
                 int a = e.getActionMasked();
@@ -152,15 +146,18 @@ public class MainActivity extends Activity {
 
         });
 
-        if (prefs.getBoolean(PREF_MODIFIED, false)) {
+        if (prefs.getBoolean(PREF_MODIFIED, false))
             restoreStashedBuffer();
-            setModified();
-        } else {
+        else
             loadFile();
-        }
+    }
 
-        int pos = prefs.getInt(PREF_CUR_POS, 0);
-        editText.setSelection(pos);
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        if (!hasFocus) return;
+
+        editText.setSelection(prefs.getInt(PREF_CUR_POS, 0));
+        sv.scrollTo(0, prefs.getInt(PREF_SCROLL_Y, 0));
     }
 
     @Override
@@ -169,10 +166,17 @@ public class MainActivity extends Activity {
 
         editor.putBoolean(PREF_MODIFIED, modified);
         editor.putInt(PREF_CUR_POS, editText.getSelectionStart());
+        editor.putInt(PREF_SCROLL_Y, sv.getScrollY());
+
         editor.apply();
 
         if (modified)
             stashBuffer();
+    }
+
+    @Override
+    public void onBackPressed() {
+        moveTaskToBack(true);
     }
 
     public void hClick(android.view.View v) {
@@ -194,8 +198,12 @@ public class MainActivity extends Activity {
     }
 
     private void restoreStashedBuffer() {
-        loadFile(STASH);
-        removeStashFile();
+        if (loadFile(STASH)) {
+            removeStashFile();
+            setModified();
+        } else {
+            loadFile();
+        }
     }
 
     private void removeStashFile() {
@@ -214,7 +222,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void loadFile(String fname) {
+    private boolean loadFile(String fname) {
         try {
             FileInputStream fis = openFileInput(fname);
             ByteArrayOutputStream result = new ByteArrayOutputStream();
@@ -230,8 +238,12 @@ public class MainActivity extends Activity {
             editText.requestFocus();
         } catch (FileNotFoundException e) {
             //Toast.makeText(this, "File not found!", Toast.LENGTH_SHORT).show();
+            return false;
         } catch (Exception e) {
             Toast.makeText(this, "Error reading file!", Toast.LENGTH_SHORT).show();
+            return false;
         }
+
+        return true;
     }
 }
