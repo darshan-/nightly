@@ -24,6 +24,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.service.notification.StatusBarNotification;
+import android.text.TextWatcher;
 import android.view.inputmethod.InputMethodManager;
 import android.view.MotionEvent;
 import android.view.View;
@@ -61,19 +62,30 @@ import java.util.List;
 // I just want it to be simply, but the prompt asking for storage permissions and then another complaining about
 //   targeting an old API level makes it kinda clunky anyway...
 
+// Context.getFilesDir() to just use always-available, internal storage, and have cloud be source of truth...
+//  As long as I'm running a rooted device, I can still adb shell, su, copy to /sdcard/, then pull.
 
 public class MainActivity extends Activity {
     private static final String PREFS_FILE = "settings";
-    private static final String FILE = "/mnt/sdcard/Nightly0001";
-    // private static final String P_READ = android.Manifest.permission.READ_EXTERNAL_STORAGE;
-    // private static final int PR_READ = 1;
-    // private static final String P_WRITE = android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
-    // private static final int PR_WRITE = 2;
+    private static final String FILE = "nightly.txt";
 
     private SharedPreferences prefs;
     private boolean lastMEWasDown = false;
     private float lastX, lastY;
     private EditText editText;
+    private TextView header;
+    private boolean modified;
+
+    private void setModified() {
+        modified = true;
+        //header.setText("* Nightly");
+        header.setText(android.text.Html.fromHtml("<font face=\"monospace\">*</font> Nightly"));
+    }
+
+    private void setUnmodified() {
+        modified = false;
+        header.setText("Nightly");
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,41 +101,24 @@ public class MainActivity extends Activity {
         editText = (EditText) findViewById(R.id.editor);
         editText.requestFocus();
 
-        TextView header = (TextView) findViewById(R.id.header);
-        header.setText("Nightly");
+        header = (TextView) findViewById(R.id.header);
+        setUnmodified();
+
+        editText.addTextChangedListener(new TextWatcher () {
+            @Override
+            public void afterTextChanged(android.text.Editable s) {
+                setModified();
+            }
+            @Override
+            public void beforeTextChanged(java.lang.CharSequence s, int start, int count, int after){}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count){}
+        });
 
         findViewById(R.id.sv).setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View view, MotionEvent e) {
-                //EditText editText = (EditText) findViewById(R.id.editor);
-                //if (editText != null)
-                //editText.setText("YOYO");
-                //editText.requestFocusFromTouch();
-
-                /*
-
-                  Okay, let's actually look at the MotionEvent --
-                  I guess like swapadoodle, keep track of last event.
-                  If last event was down, and this is up, then show keyboard and return true.
-                  Otherwise don't do anything and return false.
-
-                  lastMEWasDown
-
-                  (maybe always return false?  Certainly we don't want to open keyboad if scrolling, though,
-                    so definitely want to keep track of down/up)
-
-                 */
-
                 int a = e.getActionMasked();
-
-                String s = "";
-                //editText.setText("action: " + a);
-                if (a == MotionEvent.ACTION_DOWN) s += "D: ";
-                if (a == MotionEvent.ACTION_MOVE) s += "M: ";
-                if (a == MotionEvent.ACTION_UP) s += "U: ";
-                s += e.getX() + ", " + e.getY();
-                //editText.setText(s);
-                //editText.append(s + "\n");
 
                 if (a == MotionEvent.ACTION_DOWN) {
                     lastMEWasDown = true;
@@ -135,6 +130,7 @@ public class MainActivity extends Activity {
                 if (a == MotionEvent.ACTION_UP && lastMEWasDown) {
                     InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
                     imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
+                    editText.setSelection(editText.getText().length());
                 }
 
                 if (a == MotionEvent.ACTION_MOVE && lastMEWasDown) {
@@ -149,23 +145,8 @@ public class MainActivity extends Activity {
             }
 
         });
-        // findViewById(R.id.sv).setOnClickListener(new View.OnClickListener() {
-        //     @Override
-        //     public void onClick(View view) {
-        //         //EditText editText = (EditText ) findViewById(R.id.editor);
-        //         //if (editText != null)
-        //         editText.setText("rara");
-        //     }
-        // });
 
-        //if (checkReadPermission() && checkWritePermission())
-        //init();
         loadFile();
-    }
-
-    void init() {
-        //if (checkReadPermission() && checkWritePermission())
-        //loadFile();
     }
 
     @Override
@@ -181,6 +162,12 @@ public class MainActivity extends Activity {
     @Override
     public void onPause() {
         super.onPause();
+
+        if (modified) {
+            // Safe buffer, either as its own file, or some other way, so we can restore
+            // We want to keep cursor position, that modified is set, etc.
+            // Best to do with bundle instance state stuff?
+        }
     }
 
     // @Override
@@ -203,55 +190,6 @@ public class MainActivity extends Activity {
     //     }
     // }
 
-    // public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-    //     System.out.println("....................... oRPR");
-    //     switch (requestCode) {
-    //     case PR_READ:
-    //         if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-    //             init();
-    //         } else {
-    //             Toast.makeText(this, "Need storage read permission", Toast.LENGTH_SHORT).show();
-    //             checkReadPermission();
-    //         }
-
-    //         break;
-    //     case PR_WRITE:
-    //         if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-    //             init();
-    //         } else {
-    //             Toast.makeText(this, "Need storage write permission", Toast.LENGTH_SHORT).show();
-    //             checkWritePermission();
-    //         }
-
-    //         break;
-    //     }
-    // }
-
-    // private boolean checkReadPermission() {
-    //     System.out.println("....................... check READ perm");
-
-    //     if (checkSelfPermission(P_READ) != PackageManager.PERMISSION_GRANTED) {
-    //         System.out.println("....................... requesting read perm");
-    //         requestPermissions(new String[]{P_READ}, PR_READ);
-    //         return false;
-    //     }
-    //     System.out.println("....................... HAVE read perm");
-
-    //     return true;
-    // }
-
-    // private boolean checkWritePermission() {
-    //     System.out.println("....................... check READ perm");
-    //     if (checkSelfPermission(P_WRITE) != PackageManager.PERMISSION_GRANTED) {
-    //         System.out.println("....................... requesting write perm");
-    //         requestPermissions(new String[]{P_WRITE}, PR_WRITE);
-    //         return false;
-    //     }
-    //     System.out.println("....................... HAVE write perm");
-
-    //     return true;
-    // }
-
     public void svClick(android.view.View v) {
         //EditText editText = (EditText ) findViewById(R.id.editor);
         //if (editText != null)
@@ -264,56 +202,36 @@ public class MainActivity extends Activity {
     }
 
     private void saveFile() {
+        try {
+            FileOutputStream fos = openFileOutput(FILE, 0);
+            fos.write(editText.getText().toString().getBytes());
+            setUnmodified();
+        } catch (FileNotFoundException e) {
+            Toast.makeText(this, "File not found!", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Error writing file!", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void loadFile() {
-        StringBuffer result = new StringBuffer();
-
         try {
-            // Uri uri = Uri.fromFile(new File(FILE));
-            // File fu = new File(uri.getPath());
+            FileInputStream fis = openFileInput(FILE);
+            ByteArrayOutputStream result = new ByteArrayOutputStream();
+            byte[] buf = new byte[1024];
+            int len;
 
-            // if (fu.isFile()) {
-            //     System.out.println("....................... IS FILE!  YAY!!!");
-            // } else {
-            //     System.out.println("....................... is NOT file!  BOOOO!!!");
-            // }
-
-            // FileReader f = new FileReader(uri.getPath().toString());
-            // File file = new File(uri.getPath().toString());
-
-            FileReader f = new FileReader(FILE);
-            File file = new File(FILE);
-
-            if (f == null)
-                throw(new FileNotFoundException());
-
-            if (file.isDirectory())
-                throw(new IOException());
-
-            // if the file has nothing in it there will be an exception here
-            // that actually isn't a problem
-            if (file.length() != 0 && !file.isDirectory()) {
-                char[] buffer;
-                buffer = new char[1024];
-                int read = 0;
-
-                do {
-                    read = f.read(buffer, 0, 1000);
-
-                    if (read >= 0)
-                        result.append(buffer, 0, read);
-                } while (read >= 0);
+            while ((len = fis.read(buf)) != -1) {
+                result.write(buf, 0, len);
             }
+            String s = result.toString("UTF-8");
+            editText.setText(s);
+            editText.setSelection(s.length());
+            editText.requestFocus();
+            setUnmodified();
         } catch (FileNotFoundException e) {
-            Toast.makeText(this, "File not found!", Toast.LENGTH_SHORT).show();
-        } catch (IOException e) {
-            Toast.makeText(this, "Error reading file!", Toast.LENGTH_SHORT).show();
+            //Toast.makeText(this, "File not found!", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
-            Toast.makeText(this, "Unknown error!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Error reading file!", Toast.LENGTH_SHORT).show();
         }
-
-        editText.requestFocus();
-        editText.setText(result.toString());
     }
 }
