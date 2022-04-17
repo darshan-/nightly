@@ -25,12 +25,18 @@ import android.os.Build;
 import android.os.Bundle;
 import android.service.notification.StatusBarNotification;
 import android.text.TextWatcher;
+import android.view.ContextMenu;
+import android.view.ContextMenu.ContextMenuInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.EditText;
+import android.widget.PopupMenu;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -67,12 +73,11 @@ public class MainActivity extends Activity {
 
     private SharedPreferences prefs;
     private SharedPreferences.Editor editor;
-    private boolean lastMEWasDown = false;
-    private float lastX, lastY;
     private EditText editText;
     private TextView header;
     private ScrollView sv;
     private boolean modified;
+    private boolean loaded;
 
     private void setModified() {
         modified = true;
@@ -85,6 +90,14 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
+        super.onCreateContextMenu(menu, v, menuInfo);
+
+        getMenuInflater().inflate(R.menu.menu, menu);
+    }
+
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
@@ -92,6 +105,9 @@ public class MainActivity extends Activity {
         editor = prefs.edit();
 
         setContentView(R.layout.main_activity);
+
+        //setHasOptionsMenu(true);
+        //registerForContextMenu(findViewById(R.id.menu));
 
         Window w = getWindow();
         w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
@@ -115,32 +131,62 @@ public class MainActivity extends Activity {
         });
 
         sv = findViewById(R.id.sv);
-        sv.setOnTouchListener(new View.OnTouchListener() {
+        // sv.setOnTouchListener(new View.OnTouchListener() {
+        //     private boolean lastMEWasDown = false;
+        //     private float lastX, lastY;
+
+        //     @Override
+        //     public boolean onTouch(View view, MotionEvent e) {
+        //         int a = e.getActionMasked();
+
+        //         if (a == MotionEvent.ACTION_DOWN) {
+        //             lastMEWasDown = true;
+        //             lastX = e.getX();
+        //             lastY = e.getY();
+        //             return false;
+        //         }
+
+        //         if (a == MotionEvent.ACTION_UP && lastMEWasDown) {
+        //             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        //             imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
+        //             editText.setSelection(editText.getText().length());
+        //         }
+
+        //         if (a == MotionEvent.ACTION_MOVE && lastMEWasDown) {
+        //             if (lastX - e.getX() < 6 &&
+        //                 lastY - e.getY() < 6 &&
+        //                 e.getX() - lastX < 6 &&
+        //                 e.getY() - lastY < 6) return false;
+        //         }
+
+        //         lastMEWasDown = false;
+        //         return false;
+        //     }
+
+        // });
+
+        header.setOnTouchListener(new View.OnTouchListener() {
+            private float lastX;
+
             @Override
             public boolean onTouch(View view, MotionEvent e) {
                 int a = e.getActionMasked();
 
                 if (a == MotionEvent.ACTION_DOWN) {
-                    lastMEWasDown = true;
                     lastX = e.getX();
-                    lastY = e.getY();
                     return false;
                 }
 
-                if (a == MotionEvent.ACTION_UP && lastMEWasDown) {
-                    InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                    imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
-                    editText.setSelection(editText.getText().length());
+                if (a == MotionEvent.ACTION_UP) {
+                    if (e.getX() - lastX > 70) {
+                        header.append("R");
+                        return true;
+                    } else if (lastX - e.getX() > 70) {
+                        header.append("L");
+                        return true;
+                    }
                 }
 
-                if (a == MotionEvent.ACTION_MOVE && lastMEWasDown) {
-                    if (lastX - e.getX() < 6 &&
-                        lastY - e.getY() < 6 &&
-                        e.getX() - lastX < 6 &&
-                        e.getY() - lastY < 6) return false;
-                }
-
-                lastMEWasDown = false;
                 return false;
             }
 
@@ -155,9 +201,12 @@ public class MainActivity extends Activity {
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         if (!hasFocus) return;
+        if (loaded) return;
 
         editText.setSelection(prefs.getInt(PREF_CUR_POS, 0));
         sv.scrollTo(0, prefs.getInt(PREF_SCROLL_Y, 0));
+
+        loaded = true;
     }
 
     @Override
@@ -180,7 +229,21 @@ public class MainActivity extends Activity {
     }
 
     public void hClick(android.view.View v) {
-        saveFile();
+        if (modified) saveFile();
+    }
+
+    public void menuClick(android.view.View v) {
+        //openOptionsMenu();
+        //openContextMenu(findViewById(R.id.menu));
+
+        //PopupMenu popup = new PopupMenu(this, v);
+        //PopupMenu popup = new PopupMenu(this, findViewById(R.id.sv));
+        //MenuInflater inflater = popup.getMenuInflater();
+        //inflater.inflate(R.menu.menu, popup.getMenu());
+        //PopupMenu popup = new PopupMenu(this, findViewById(R.id.sv), android.view.Gravity.TOP, 0, R.style.popup);
+        PopupMenu popup = new PopupMenu(this, findViewById(R.id.menu), android.view.Gravity.TOP|android.view.Gravity.RIGHT);
+        popup.inflate(R.menu.menu);
+        popup.show();
     }
 
     private void saveFile() {

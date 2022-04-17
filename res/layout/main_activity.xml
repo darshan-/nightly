@@ -5,18 +5,47 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
 >
-  <TextView
-    android:id="@+id/header"
-    android:layout_width="fill_parent"
-    android:layout_height="38dp"
-    android:background="#570082"
-    android:textColor="#ddd"
-    android:typeface="sans"
-    android:textSize="18dp"
-    android:gravity="left|center_vertical"
-    android:paddingLeft="6dp"
-    android:onClick="hClick"
-  />
+  <LinearLayout
+      android:orientation="horizontal"
+      android:layout_width="match_parent"
+      android:layout_height="38dp"
+      android:background="#570082"
+  >
+    <TextView
+        android:id="@+id/header"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="fill_parent"
+        android:textColor="#ddd"
+        android:typeface="sans"
+        android:textSize="18dp"
+        android:gravity="left|center_vertical"
+        android:paddingLeft="6dp"
+        android:onClick="hClick"
+    />
+    <TextView
+        android:id="@+id/menu"
+        android:layout_width="38dp"
+        android:layout_height="fill_parent"
+        android:typeface="sans"
+        android:textColor="#ddd"
+        android:textSize="40dp"
+        android:translationY="-10dp"
+        android:gravity="center|center_vertical"
+        android:text="≡"
+        android:onClick="menuClick"
+    />
+    <!--
+        android:textStyle="bold"
+        Ξ
+        ≋
+        ⁝
+        ⁘
+        Ⅲ
+        ≣
+-->
+
+  </LinearLayout>
 
   <ScrollView
       android:id="@+id/sv"
