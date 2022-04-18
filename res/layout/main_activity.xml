@@ -6,6 +6,7 @@
     android:layout_height="match_parent"
 >
   <LinearLayout
+      android:id="@+id/header_bar"
       android:orientation="horizontal"
       android:layout_width="match_parent"
       android:layout_height="38dp"
@@ -35,16 +36,7 @@
         android:text="≡"
         android:onClick="menuClick"
     />
-    <!--
-        android:textStyle="bold"
-        Ξ
-        ≋
-        ⁝
-        ⁘
-        Ⅲ
-        ≣
--->
-
+    <!-- ☰ -->
   </LinearLayout>
 
   <ScrollView

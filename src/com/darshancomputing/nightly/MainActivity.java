@@ -27,6 +27,7 @@ import android.service.notification.StatusBarNotification;
 import android.text.TextWatcher;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
+import android.view.Gravity;
 import android.view.inputmethod.InputMethodManager;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -54,6 +55,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.CharSequence;
 import java.lang.Runnable;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -64,8 +66,8 @@ import java.util.List;
 
 public class MainActivity extends Activity {
     private static final String PREFS = "settings";
-    private static final String FILE = "nightly.txt";
-    private static final String STASH = FILE + "~" ;
+    private static final String MEDS = "Meds";
+    private static final String NOTES = "Notes";
 
     private static final String PREF_CUR_POS = "cur_pos";
     private static final String PREF_SCROLL_Y = "scroll_y";
@@ -77,16 +79,45 @@ public class MainActivity extends Activity {
     private TextView header;
     private ScrollView sv;
     private boolean modified;
+    private String bufName;
     private boolean loaded;
 
+    private int oCurPos, oScroll;
+    private boolean oModified;
+    private String oText, oBufName;;
+
+    private void setModified(boolean m) {
+        modified = m;
+        setHeader();
+    }
+
     private void setModified() {
-        modified = true;
-        header.setText(android.text.Html.fromHtml("<font face=\"monospace\">*</font> Nightly"));
+        setModified(true);
     }
 
     private void setUnmodified() {
-        modified = false;
-        header.setText("Nightly");
+        setModified(false);
+    }
+
+    private void setHeader() {
+        //final String ast = "<font face=\"monospace\">*</font>";
+        //String s = "";
+        // if (modified) s += ast + " ";
+        // if (oModified) s += "(" + ast + ") ";
+
+        // CharSequence h = bufName;
+        // if (s.length() > 0)
+        //     h = android.text.Html.fromHtml(s + h);
+
+        // header.setText(h);
+
+        String s = "";
+
+        // * ⁕ ∗ ⋇ ☀ ☸ ☼ ⚐ ⚑ ⚠ ⚹ ✳ ✻ ❊ ❋ † ‡ Δ ※ ‼ ⁑
+        if (modified) s += "✳ ";
+        if (oModified) s += "(✳) ";
+
+        header.setText(s + bufName);
     }
 
     @Override
@@ -105,6 +136,9 @@ public class MainActivity extends Activity {
         editor = prefs.edit();
 
         setContentView(R.layout.main_activity);
+
+        //bufName = "Meds";
+        //oBufName = "Notes";
 
         //setHasOptionsMenu(true);
         //registerForContextMenu(findViewById(R.id.menu));
@@ -131,6 +165,7 @@ public class MainActivity extends Activity {
         });
 
         sv = findViewById(R.id.sv);
+        sv.setSmoothScrollingEnabled(false);
         // sv.setOnTouchListener(new View.OnTouchListener() {
         //     private boolean lastMEWasDown = false;
         //     private float lastX, lastY;
@@ -178,13 +213,22 @@ public class MainActivity extends Activity {
                 }
 
                 if (a == MotionEvent.ACTION_UP) {
-                    if (e.getX() - lastX > 70) {
-                        header.append("R");
-                        return true;
-                    } else if (lastX - e.getX() > 70) {
-                        header.append("L");
+                    float hDelta = e.getX() - lastX;
+
+                    if (hDelta > 70 || hDelta < -70) {
+                        swapBuffer();
                         return true;
                     }
+
+                    // if (e.getX() - lastX > 70) {
+                    //     //header.append("R");
+                    //     swapBuffer();
+                    //     return true;
+                    // } else if (lastX - e.getX() > 70) {
+                    //     //header.append("L");
+                    //     swapBuffer();
+                    //     return true;
+                    // }
                 }
 
                 return false;
@@ -192,10 +236,37 @@ public class MainActivity extends Activity {
 
         });
 
-        if (prefs.getBoolean(PREF_MODIFIED, false))
-            restoreStashedBuffer();
-        else
-            loadFile();
+        // if (prefs.getBoolean(PREF_MODIFIED, false))
+        //     restoreStashedBuffer();
+        //else
+            loadFiles();
+    }
+
+    private void swapBuffer() {
+        int tCurPos, tScroll;
+        boolean tModified;
+        String tText, tBufName;
+
+        // TODO: Have a data structure (inner class?) for this?
+        tCurPos = editText.getSelectionStart();
+        tScroll = sv.getScrollY();
+        tModified = modified;
+        tText = editText.getText().toString();
+        tBufName = bufName;
+
+        editText.setText(oText);
+        editText.setSelection(oCurPos);
+        sv.scrollTo(0, oScroll);
+        bufName = oBufName;
+        modified = oModified;
+
+        oCurPos = tCurPos;
+        oScroll = tScroll;
+        oModified = tModified;
+        oText = tText;
+        oBufName = tBufName;
+
+        setHeader();
     }
 
     @Override
@@ -203,7 +274,9 @@ public class MainActivity extends Activity {
         if (!hasFocus) return;
         if (loaded) return;
 
-        editText.setSelection(prefs.getInt(PREF_CUR_POS, 0));
+        try {
+            editText.setSelection(prefs.getInt(PREF_CUR_POS, 0));
+        } catch (Exception e) {}
         sv.scrollTo(0, prefs.getInt(PREF_SCROLL_Y, 0));
 
         loaded = true;
@@ -219,8 +292,8 @@ public class MainActivity extends Activity {
 
         editor.apply();
 
-        if (modified)
-            stashBuffer();
+        // if (modified)
+        //     stashBuffer();
     }
 
     @Override
@@ -233,46 +306,45 @@ public class MainActivity extends Activity {
     }
 
     public void menuClick(android.view.View v) {
-        //openOptionsMenu();
-        //openContextMenu(findViewById(R.id.menu));
-
         //PopupMenu popup = new PopupMenu(this, v);
-        //PopupMenu popup = new PopupMenu(this, findViewById(R.id.sv));
-        //MenuInflater inflater = popup.getMenuInflater();
-        //inflater.inflate(R.menu.menu, popup.getMenu());
-        //PopupMenu popup = new PopupMenu(this, findViewById(R.id.sv), android.view.Gravity.TOP, 0, R.style.popup);
-        PopupMenu popup = new PopupMenu(this, findViewById(R.id.menu), android.view.Gravity.TOP|android.view.Gravity.RIGHT);
+        //PopupMenu popup = new PopupMenu(this, findViewById(R.id.menu), android.view.Gravity.TOP|android.view.Gravity.RIGHT);
+        // PopupMenu popup = new PopupMenu(this, findViewById(R.id.header_bar));
+        // popup.setGravity(android.view.Gravity.BOTTOM|android.view.Gravity.RIGHT);
+        PopupMenu popup = new PopupMenu(this, findViewById(R.id.header_bar), Gravity.BOTTOM|Gravity.RIGHT);
         popup.inflate(R.menu.menu);
         popup.show();
     }
 
     private void saveFile() {
-        saveFile(FILE);
+        saveFile(bufName);
         setUnmodified();
     }
 
-    private void loadFile() {
-        loadFile(FILE);
-        setUnmodified();
+    private void loadFiles() {
+        // Load secondary first, so we're done after swapping and loading primary (TODO: keep track of which is open)
+        loadFile(NOTES);
+        swapBuffer();
+        loadFile(MEDS);
+        setHeader();
     }
 
-    private void stashBuffer() {
-        saveFile(STASH);
-    }
+    // private void stashBuffer() {
+    //     saveFile(bufName + "~");
+    // }
 
-    private void restoreStashedBuffer() {
-        if (loadFile(STASH)) {
-            removeStashFile();
-            setModified();
-        } else {
-            loadFile();
-        }
-    }
+    // private void restoreStashedBuffer() {
+    //     if (loadFile(STASH)) {
+    //         removeStashFile();
+    //         setModified();
+    //     } else {
+    //         loadFile();
+    //     }
+    // }
 
-    private void removeStashFile() {
-        File f = new File(getFilesDir(), STASH);
-        f.delete();
-    }
+    // private void removeStashFile() {
+    //     File f = new File(getFilesDir(), STASH);
+    //     f.delete();
+    // }
 
     private void saveFile(String fname) {
         try {
@@ -298,13 +370,16 @@ public class MainActivity extends Activity {
             String s = result.toString("UTF-8");
             editText.setText(s);
             editText.setSelection(s.length());
-            editText.requestFocus();
         } catch (FileNotFoundException e) {
             //Toast.makeText(this, "File not found!", Toast.LENGTH_SHORT).show();
             return false;
         } catch (Exception e) {
             Toast.makeText(this, "Error reading file!", Toast.LENGTH_SHORT).show();
             return false;
+        } finally {
+            editText.requestFocus();
+            bufName = fname;
+            modified = false;
         }
 
         return true;
