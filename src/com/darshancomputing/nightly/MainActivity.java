@@ -69,9 +69,20 @@ public class MainActivity extends Activity {
     private static final String MEDS = "Meds";
     private static final String NOTES = "Notes";
 
-    private static final String PREF_CUR_POS = "cur_pos";
-    private static final String PREF_SCROLL_Y = "scroll_y";
-    private static final String PREF_MODIFIED = "modified";
+    // private static final String PREF_M_CUR_POS = "m_cur_pos";
+    // private static final String PREF_M_SCROLL = "m_scroll";
+    // private static final String PREF_M_MODIFIED = "m_modified";
+    // private static final String PREF_M_STASH = "m_stash";
+    // private static final String PREF_N_CUR_POS = "n_cur_pos";
+    // private static final String PREF_N_SCROLL = "n_scroll";
+    // private static final String PREF_N_MODIFIED = "n_modified";
+    // private static final String PREF_N_STASH = "n_stash";
+    private static final String PREF_X_CUR_POS = "_cur_pos";
+    private static final String PREF_X_SCROLL = "_scroll";
+    private static final String PREF_X_MODIFIED = "_modified";
+    private static final String PREF_X_SAVED_TEXT = "_saved_text";
+    private static final String PREF_X_TEXT = "_text";
+    private static final String PREF_CUR_BUF = "cur_buf";
 
     private SharedPreferences prefs;
     private SharedPreferences.Editor editor;
@@ -81,43 +92,119 @@ public class MainActivity extends Activity {
     private boolean modified;
     private String bufName;
     private boolean loaded;
+    private boolean loadingBuffer;
 
-    private int oCurPos, oScroll;
-    private boolean oModified;
-    private String oText, oBufName;;
+    private class Buffer {
+        private int curPos, scroll;
+        private boolean modified;
+        private String text, bufName;
 
-    private void setModified(boolean m) {
-        modified = m;
+        private Buffer(String name) {
+            bufName = name;
+
+            curPos = prefs.getInt(bufName + PREF_X_CUR_POS, 0);
+            scroll = prefs.getInt(bufName + PREF_X_SCROLL, 0);
+            modified = prefs.getBoolean(bufName + PREF_X_MODIFIED, false);
+            if (modified)
+                text = prefs.getString(bufName + PREF_X_TEXT, "");
+            else
+                text = prefs.getString(bufName + PREF_X_SAVED_TEXT, "");
+        }
+
+        private void save() {
+            if (!modified) return;
+
+            modified = false;
+            putState();
+            editor.putString(bufName + PREF_X_SAVED_TEXT, editText.getText().toString());
+
+            editor.commit();
+
+            setHeader();
+        }
+
+        private void stash() {
+            putState();
+
+            if (modified)
+                editor.putString(bufName + PREF_X_TEXT, editText.getText().toString());
+
+            editor.commit();
+        }
+
+        private void putState() {
+            editor.putInt(bufName + PREF_X_CUR_POS, curPos);
+            editor.putInt(bufName + PREF_X_SCROLL, scroll);
+            editor.putBoolean(bufName + PREF_X_MODIFIED, modified);
+        }
+
+        // private Buffer(Buffer b) {
+        //     //b.sync(); // What if it's not the current buffer?
+
+        //     curPos = b.curPos;
+        //     scroll = b.scroll;
+        //     modified = b.modified;
+        //     text = b.text;
+        //     bufName = b.bufName;
+        // }
+
+        // private void sync() {
+        //     curPos = editText.getSelectionStart();
+        //     scroll = sv.getScrollY();
+        //     text = editText.getText().toString();
+        // }
+
+        // private void makeActive() {
+        //     editText.setText(text);
+        //     editText.setSelection(curPos);
+        //     sv.scrollTo(0, scroll);
+        //     setHeader();
+        // }
+
+        //private Buffer dup()
+    }
+
+    private Buffer cur, oth;
+
+    // private int oCurPos, oScroll;
+    // private boolean oModified;
+    // private String oText, oBufName;;
+
+    private void loadBuffer(Buffer b) {
+        loadingBuffer = true;
+        editText.setText(b.text);
+        loadingBuffer = false;
+
+        try {
+            editText.setSelection(b.curPos);
+        } catch (Exception e) {
+            editText.setSelection(b.text.length());
+        }
+        editText.requestFocus();
+        sv.scrollTo(0, b.scroll);
+
         setHeader();
     }
 
-    private void setModified() {
-        setModified(true);
+    private void syncToCur() {
+        cur.curPos = editText.getSelectionStart();
+        cur.scroll = sv.getScrollY();
+        cur.text = editText.getText().toString();
     }
 
-    private void setUnmodified() {
-        setModified(false);
+    private void setModified(boolean m) {
+        cur.modified = m;
+        setHeader();
     }
 
+    // * ⁕ ∗ ⋇ ☀ ☸ ☼ ⚐ ⚑ ⚠ ⚹ ✳ ✻ ❊ ❋ † ‡ Δ ※ ‼ ⁑
     private void setHeader() {
-        //final String ast = "<font face=\"monospace\">*</font>";
-        //String s = "";
-        // if (modified) s += ast + " ";
-        // if (oModified) s += "(" + ast + ") ";
-
-        // CharSequence h = bufName;
-        // if (s.length() > 0)
-        //     h = android.text.Html.fromHtml(s + h);
-
-        // header.setText(h);
-
         String s = "";
 
-        // * ⁕ ∗ ⋇ ☀ ☸ ☼ ⚐ ⚑ ⚠ ⚹ ✳ ✻ ❊ ❋ † ‡ Δ ※ ‼ ⁑
-        if (modified) s += "✳ ";
-        if (oModified) s += "(✳) ";
+        if (cur.modified) s += "✳ ";
+        if (oth.modified) s += "(✳) ";
 
-        header.setText(s + bufName);
+        header.setText(s + cur.bufName);
     }
 
     @Override
@@ -137,26 +224,20 @@ public class MainActivity extends Activity {
 
         setContentView(R.layout.main_activity);
 
-        //bufName = "Meds";
-        //oBufName = "Notes";
-
-        //setHasOptionsMenu(true);
-        //registerForContextMenu(findViewById(R.id.menu));
-
         Window w = getWindow();
         w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
         w.setStatusBarColor(0xff000000);
 
         editText = (EditText) findViewById(R.id.editor);
-        editText.requestFocus();
+        //editText.requestFocus();
 
         header = (TextView) findViewById(R.id.header);
 
         editText.addTextChangedListener(new TextWatcher () {
             @Override
             public void afterTextChanged(android.text.Editable s) {
-                setModified();
+                if (!loadingBuffer) setModified(true);
             }
             @Override
             public void beforeTextChanged(java.lang.CharSequence s, int start, int count, int after){}
@@ -166,39 +247,6 @@ public class MainActivity extends Activity {
 
         sv = findViewById(R.id.sv);
         sv.setSmoothScrollingEnabled(false);
-        // sv.setOnTouchListener(new View.OnTouchListener() {
-        //     private boolean lastMEWasDown = false;
-        //     private float lastX, lastY;
-
-        //     @Override
-        //     public boolean onTouch(View view, MotionEvent e) {
-        //         int a = e.getActionMasked();
-
-        //         if (a == MotionEvent.ACTION_DOWN) {
-        //             lastMEWasDown = true;
-        //             lastX = e.getX();
-        //             lastY = e.getY();
-        //             return false;
-        //         }
-
-        //         if (a == MotionEvent.ACTION_UP && lastMEWasDown) {
-        //             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        //             imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
-        //             editText.setSelection(editText.getText().length());
-        //         }
-
-        //         if (a == MotionEvent.ACTION_MOVE && lastMEWasDown) {
-        //             if (lastX - e.getX() < 6 &&
-        //                 lastY - e.getY() < 6 &&
-        //                 e.getX() - lastX < 6 &&
-        //                 e.getY() - lastY < 6) return false;
-        //         }
-
-        //         lastMEWasDown = false;
-        //         return false;
-        //     }
-
-        // });
 
         header.setOnTouchListener(new View.OnTouchListener() {
             private float lastX;
@@ -219,16 +267,6 @@ public class MainActivity extends Activity {
                         swapBuffer();
                         return true;
                     }
-
-                    // if (e.getX() - lastX > 70) {
-                    //     //header.append("R");
-                    //     swapBuffer();
-                    //     return true;
-                    // } else if (lastX - e.getX() > 70) {
-                    //     //header.append("L");
-                    //     swapBuffer();
-                    //     return true;
-                    // }
                 }
 
                 return false;
@@ -236,48 +274,91 @@ public class MainActivity extends Activity {
 
         });
 
+        load();
         // if (prefs.getBoolean(PREF_MODIFIED, false))
         //     restoreStashedBuffer();
         //else
-            loadFiles();
+        //    loadFiles();
+    }
+
+    private void load() {
+        String curBuf = prefs.getString(PREF_CUR_BUF, MEDS);
+
+        Buffer meds = new Buffer(MEDS);
+        Buffer notes = new Buffer(NOTES);
+
+        if (prefs.getString(PREF_CUR_BUF, MEDS).equals(MEDS)) {
+            cur = meds;
+            oth = notes;
+        } else {
+            cur = notes;
+            oth = meds;
+        }
+
+        loadBuffer(cur);
     }
 
     private void swapBuffer() {
-        int tCurPos, tScroll;
-        boolean tModified;
-        String tText, tBufName;
+        // //cur.sync();
+        // syncToBuffer(cur);
+        // Buffer tmp = new Buffer(cur);
+        // cur = oth;
+        // oth = tmp;
 
-        // TODO: Have a data structure (inner class?) for this?
-        tCurPos = editText.getSelectionStart();
-        tScroll = sv.getScrollY();
-        tModified = modified;
-        tText = editText.getText().toString();
-        tBufName = bufName;
+        // cur.makeActive();
 
-        editText.setText(oText);
-        editText.setSelection(oCurPos);
-        sv.scrollTo(0, oScroll);
-        bufName = oBufName;
-        modified = oModified;
+        //syncToBuffer(cur); // Grab state from editText and sv
+        syncToCur();
+        cur.stash();
 
-        oCurPos = tCurPos;
-        oScroll = tScroll;
-        oModified = tModified;
-        oText = tText;
-        oBufName = tBufName;
+        // We're just swapping references, not making new objects or copying data.
+        Buffer tmp = cur;
+        cur = oth;
+        oth = tmp;
 
-        setHeader();
+        loadBuffer(cur); // Update state from new cur
     }
+
+    // private void swapBuffer() {
+    //     int tCurPos, tScroll;
+    //     boolean tModified;
+    //     String tText, tBufName;
+
+    //     // TODO: Have a data structure (inner class?) for this?
+    //     tCurPos = editText.getSelectionStart();
+    //     tScroll = sv.getScrollY();
+    //     tModified = modified;
+    //     tText = editText.getText().toString();
+    //     tBufName = bufName;
+
+    //     editText.setText(oText);
+    //     editText.setSelection(oCurPos);
+    //     sv.scrollTo(0, oScroll);
+    //     bufName = oBufName;
+    //     modified = oModified;
+
+    //     oCurPos = tCurPos;
+    //     oScroll = tScroll;
+    //     oModified = tModified;
+    //     oText = tText;
+    //     oBufName = tBufName;
+
+    //     setHeader();
+    // }
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         if (!hasFocus) return;
         if (loaded) return;
 
-        try {
-            editText.setSelection(prefs.getInt(PREF_CUR_POS, 0));
-        } catch (Exception e) {}
-        sv.scrollTo(0, prefs.getInt(PREF_SCROLL_Y, 0));
+        //loadBuffer(cur);
+        // try {
+        //     editText.setSelection(prefs.getInt(PREF_CUR_POS, 0));
+        // } catch (Exception e) {}
+        // sv.scrollTo(0, prefs.getInt(PREF_SCROLL_Y, 0));
+
+        try {editText.setSelection(cur.curPos);} catch (Exception e) {}
+        sv.scrollTo(0, cur.scroll);
 
         loaded = true;
     }
@@ -286,11 +367,18 @@ public class MainActivity extends Activity {
     public void onPause() {
         super.onPause();
 
-        editor.putBoolean(PREF_MODIFIED, modified);
-        editor.putInt(PREF_CUR_POS, editText.getSelectionStart());
-        editor.putInt(PREF_SCROLL_Y, sv.getScrollY());
+        //syncToBuffer(cur);
+        syncToCur();
+        cur.stash();
 
-        editor.apply();
+        editor.putString(PREF_CUR_BUF, cur.bufName);
+        editor.commit();
+
+        // editor.putBoolean(PREF_MODIFIED, modified);
+        // editor.putInt(PREF_CUR_POS, editText.getSelectionStart());
+        // editor.putInt(PREF_SCROLL_Y, sv.getScrollY());
+
+        // editor.apply();
 
         // if (modified)
         //     stashBuffer();
@@ -302,7 +390,8 @@ public class MainActivity extends Activity {
     }
 
     public void hClick(android.view.View v) {
-        if (modified) saveFile();
+        //if (modified) saveFile();
+        cur.save();
     }
 
     public void menuClick(android.view.View v) {
@@ -315,18 +404,18 @@ public class MainActivity extends Activity {
         popup.show();
     }
 
-    private void saveFile() {
-        saveFile(bufName);
-        setUnmodified();
-    }
+    // private void saveFile() {
+    //     //saveFile(bufName);
+    //     //setModified(false);
+    // }
 
-    private void loadFiles() {
-        // Load secondary first, so we're done after swapping and loading primary (TODO: keep track of which is open)
-        loadFile(NOTES);
-        swapBuffer();
-        loadFile(MEDS);
-        setHeader();
-    }
+    // private void loadFiles() {
+    //     // Load secondary first, so we're done after swapping and loading primary (TODO: keep track of which is open)
+    //     loadFile(NOTES);
+    //     swapBuffer();
+    //     loadFile(MEDS);
+    //     setHeader();
+    // }
 
     // private void stashBuffer() {
     //     saveFile(bufName + "~");
@@ -335,7 +424,7 @@ public class MainActivity extends Activity {
     // private void restoreStashedBuffer() {
     //     if (loadFile(STASH)) {
     //         removeStashFile();
-    //         setModified();
+    //         setModified(true);
     //     } else {
     //         loadFile();
     //     }
@@ -346,42 +435,42 @@ public class MainActivity extends Activity {
     //     f.delete();
     // }
 
-    private void saveFile(String fname) {
-        try {
-            FileOutputStream fos = openFileOutput(fname, 0);
-            fos.write(editText.getText().toString().getBytes());
-        } catch (FileNotFoundException e) {
-            Toast.makeText(this, "File not found!", Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Toast.makeText(this, "Error writing file!", Toast.LENGTH_SHORT).show();
-        }
-    }
+    // private void saveFile(String fname) {
+    //     try {
+    //         FileOutputStream fos = openFileOutput(fname, 0);
+    //         fos.write(editText.getText().toString().getBytes());
+    //     } catch (FileNotFoundException e) {
+    //         Toast.makeText(this, "File not found!", Toast.LENGTH_SHORT).show();
+    //     } catch (Exception e) {
+    //         Toast.makeText(this, "Error writing file!", Toast.LENGTH_SHORT).show();
+    //     }
+    // }
 
-    private boolean loadFile(String fname) {
-        try {
-            FileInputStream fis = openFileInput(fname);
-            ByteArrayOutputStream result = new ByteArrayOutputStream();
-            byte[] buf = new byte[1024];
-            int len;
+    // private boolean loadFile(String fname) {
+    //     try {
+    //         FileInputStream fis = openFileInput(fname);
+    //         ByteArrayOutputStream result = new ByteArrayOutputStream();
+    //         byte[] buf = new byte[1024];
+    //         int len;
 
-            while ((len = fis.read(buf)) != -1) {
-                result.write(buf, 0, len);
-            }
-            String s = result.toString("UTF-8");
-            editText.setText(s);
-            editText.setSelection(s.length());
-        } catch (FileNotFoundException e) {
-            //Toast.makeText(this, "File not found!", Toast.LENGTH_SHORT).show();
-            return false;
-        } catch (Exception e) {
-            Toast.makeText(this, "Error reading file!", Toast.LENGTH_SHORT).show();
-            return false;
-        } finally {
-            editText.requestFocus();
-            bufName = fname;
-            modified = false;
-        }
+    //         while ((len = fis.read(buf)) != -1) {
+    //             result.write(buf, 0, len);
+    //         }
+    //         String s = result.toString("UTF-8");
+    //         editText.setText(s);
+    //         editText.setSelection(s.length());
+    //     } catch (FileNotFoundException e) {
+    //         //Toast.makeText(this, "File not found!", Toast.LENGTH_SHORT).show();
+    //         return false;
+    //     } catch (Exception e) {
+    //         Toast.makeText(this, "Error reading file!", Toast.LENGTH_SHORT).show();
+    //         return false;
+    //     } finally {
+    //         editText.requestFocus();
+    //         bufName = fname;
+    //         modified = false;
+    //     }
 
-        return true;
-    }
+    //     return true;
+    // }
 }
