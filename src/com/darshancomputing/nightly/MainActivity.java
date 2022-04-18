@@ -25,8 +25,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.service.notification.StatusBarNotification;
 import android.text.TextWatcher;
-import android.view.ContextMenu;
-import android.view.ContextMenu.ContextMenuInfo;
 import android.view.Gravity;
 import android.view.inputmethod.InputMethodManager;
 import android.view.Menu;
@@ -69,14 +67,6 @@ public class MainActivity extends Activity {
     private static final String MEDS = "Meds";
     private static final String NOTES = "Notes";
 
-    // private static final String PREF_M_CUR_POS = "m_cur_pos";
-    // private static final String PREF_M_SCROLL = "m_scroll";
-    // private static final String PREF_M_MODIFIED = "m_modified";
-    // private static final String PREF_M_STASH = "m_stash";
-    // private static final String PREF_N_CUR_POS = "n_cur_pos";
-    // private static final String PREF_N_SCROLL = "n_scroll";
-    // private static final String PREF_N_MODIFIED = "n_modified";
-    // private static final String PREF_N_STASH = "n_stash";
     private static final String PREF_X_CUR_POS = "_cur_pos";
     private static final String PREF_X_SCROLL = "_scroll";
     private static final String PREF_X_MODIFIED = "_modified";
@@ -86,8 +76,6 @@ public class MainActivity extends Activity {
 
     private SharedPreferences prefs;
     private SharedPreferences.Editor editor;
-    //private EditText editText;
-    //private EditText etMeds, etNotes;
     private TextWatcher textWatcher;
     private TextView header;
     private ScrollView sv;
@@ -131,12 +119,13 @@ public class MainActivity extends Activity {
 
         // Doesn't commit, as the expectation is to be used when putting other things as well.
         private void stash() {
+            curPos = editText.getSelectionStart();
+            text = editText.getText().toString();
+
             putState();
 
             if (modified)
                 editor.putString(bufName + PREF_X_TEXT, editText.getText().toString());
-
-            //editor.commit();
         }
 
         private void putState() {
@@ -145,81 +134,23 @@ public class MainActivity extends Activity {
             editor.putBoolean(bufName + PREF_X_MODIFIED, modified);
         }
 
-        // private Buffer(Buffer b) {
-        //     //b.sync(); // What if it's not the current buffer?
-
-        //     curPos = b.curPos;
-        //     scroll = b.scroll;
-        //     modified = b.modified;
-        //     text = b.text;
-        //     bufName = b.bufName;
-        // }
-
-        // private void sync() {
-        //     curPos = editText.getSelectionStart();
-        //     scroll = sv.getScrollY();
-        //     text = editText.getText().toString();
-        // }
-
-        // private void makeActive() {
-        //     editText.setText(text);
-        //     editText.setSelection(curPos);
-        //     sv.scrollTo(0, scroll);
-        //     setHeader();
-        // }
-
-        //private Buffer dup()
+        private void setSelection() {
+            try {
+                editText.setSelection(curPos);
+            } catch (Exception e) {
+                editText.setSelection(text.length());
+            }
+        }
     }
 
     private Buffer cur, oth;
 
-    // private int oCurPos, oScroll;
-    // private boolean oModified;
-    // private String oText, oBufName;;
-
     private void loadBuffer(Buffer b) {
-        long start = System.currentTimeMillis();
-        long t = start;
-
         loadingBuffer = true;
         b.editText.setText(b.text);
         loadingBuffer = false;
 
-        // setText performance is pretty bad for the large text files I use...
-        // Perhaps we're back to first thought: two EditTexts, one GONE.
-        // We'll still keep track of all the same data for restoring on fresh launch, but swiping should
-        //  be much faster that way?  I think?
-
-        long now = System.currentTimeMillis();
-        log("setting text took " + (now - t) + " ms");
-
-        t = System.currentTimeMillis();
-        try {
-            b.editText.setSelection(b.curPos);
-        } catch (Exception e) {
-            b.editText.setSelection(b.text.length());
-        }
-        now = System.currentTimeMillis();
-        log("setting selection took " + (now - t) + " ms");
-
-        t = System.currentTimeMillis();
-        b.editText.requestFocus();
-        sv.scrollTo(0, b.scroll);
-        now = System.currentTimeMillis();
-        log("requesting focus and scrolling took " + (now - t) + " ms");
-
-        t = System.currentTimeMillis();
-        setHeader();
-
-        now = System.currentTimeMillis();
-        log("setting header took " + (now - t) + " ms");
-        log("loadBuffer total took " + (now - start) + " ms");
-    }
-
-    private void syncToCur() {
-        cur.curPos = cur.editText.getSelectionStart();
-        cur.scroll = sv.getScrollY();
-        cur.text = cur.editText.getText().toString();
+        b.setSelection();
     }
 
     private void setModified(boolean m) {
@@ -238,14 +169,6 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
-        super.onCreateContextMenu(menu, v, menuInfo);
-
-        getMenuInflater().inflate(R.menu.menu, menu);
-    }
-
-
-    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
@@ -258,9 +181,6 @@ public class MainActivity extends Activity {
         w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
         w.setStatusBarColor(0xff000000);
-
-        //editText = (EditText) findViewById(R.id.editor);
-        //editText.requestFocus();
 
         header = (TextView) findViewById(R.id.header);
 
@@ -305,10 +225,6 @@ public class MainActivity extends Activity {
         });
 
         load();
-        // if (prefs.getBoolean(PREF_MODIFIED, false))
-        //     restoreStashedBuffer();
-        //else
-        //    loadFiles();
     }
 
     private void load() {
@@ -325,34 +241,21 @@ public class MainActivity extends Activity {
             oth = meds;
         }
 
-        loadBuffer(cur);
         loadBuffer(oth);
+        loadBuffer(cur);
+
+        cur.editText.setVisibility(View.VISIBLE);
+
+        cur.editText.requestFocus();
+        sv.scrollTo(0, cur.scroll);
+        setHeader();
     }
 
     private void swapBuffer() {
-        // //cur.sync();
-        // syncToBuffer(cur);
-        // Buffer tmp = new Buffer(cur);
-        // cur = oth;
-        // oth = tmp;
-
-        // cur.makeActive();
-
-        //syncToBuffer(cur); // Grab state from editText and sv
-        //cur.stash();
-
-        // We're just swapping references, not making new objects or copying data.
-
-
         long start = System.currentTimeMillis();
-        // long t = start;
-        //syncToCur();
-        // long now = System.currentTimeMillis();
-        // log("syncToCur took " + (now - t) + " ms");
-
-        // t = System.currentTimeMillis();
         cur.scroll = sv.getScrollY();
         cur.editText.setVisibility(View.GONE);
+        // We're just swapping references, not making new objects or copying data.
         Buffer tmp = cur;
         cur = oth;
         oth = tmp;
@@ -360,62 +263,16 @@ public class MainActivity extends Activity {
         cur.editText.requestFocus();
         sv.scrollTo(0, cur.scroll);
         setHeader();
-
-
-        
-        // now = System.currentTimeMillis();
-        // log("swapping took " + (now - t) + " ms");
-
-        // t = System.currentTimeMillis();
-        // loadBuffer(cur); // Update state from new cur
         long now = System.currentTimeMillis();
-        //log("loading cur took " + (now - t) + " ms");
-        log("swapping took " + (now - start) + " ms");
+        System.out.println("..................... nightly: swapping took " + (now - start) + " ms");
     }
-
-    private void log(String s) {
-        System.out.println("..................... nightly: " + s);
-    }
-
-    // private void swapBuffer() {
-    //     int tCurPos, tScroll;
-    //     boolean tModified;
-    //     String tText, tBufName;
-
-    //     // TODO: Have a data structure (inner class?) for this?
-    //     tCurPos = editText.getSelectionStart();
-    //     tScroll = sv.getScrollY();
-    //     tModified = modified;
-    //     tText = editText.getText().toString();
-    //     tBufName = bufName;
-
-    //     editText.setText(oText);
-    //     editText.setSelection(oCurPos);
-    //     sv.scrollTo(0, oScroll);
-    //     bufName = oBufName;
-    //     modified = oModified;
-
-    //     oCurPos = tCurPos;
-    //     oScroll = tScroll;
-    //     oModified = tModified;
-    //     oText = tText;
-    //     oBufName = tBufName;
-
-    //     setHeader();
-    // }
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         if (!hasFocus) return;
         if (loaded) return;
 
-        //loadBuffer(cur);
-        // try {
-        //     editText.setSelection(prefs.getInt(PREF_CUR_POS, 0));
-        // } catch (Exception e) {}
-        // sv.scrollTo(0, prefs.getInt(PREF_SCROLL_Y, 0));
-
-        try {cur.editText.setSelection(cur.curPos);} catch (Exception e) {}
+        cur.setSelection();
         sv.scrollTo(0, cur.scroll);
 
         loaded = true;
@@ -425,22 +282,12 @@ public class MainActivity extends Activity {
     public void onPause() {
         super.onPause();
 
-        //syncToBuffer(cur);
-        syncToCur();
+        cur.scroll = sv.getScrollY();
         cur.stash();
         oth.stash();
 
         editor.putString(PREF_CUR_BUF, cur.bufName);
         editor.commit();
-
-        // editor.putBoolean(PREF_MODIFIED, modified);
-        // editor.putInt(PREF_CUR_POS, editText.getSelectionStart());
-        // editor.putInt(PREF_SCROLL_Y, sv.getScrollY());
-
-        // editor.apply();
-
-        // if (modified)
-        //     stashBuffer();
     }
 
     @Override
@@ -449,15 +296,10 @@ public class MainActivity extends Activity {
     }
 
     public void hClick(android.view.View v) {
-        //if (modified) saveFile();
         cur.save();
     }
 
     public void menuClick(android.view.View v) {
-        //PopupMenu popup = new PopupMenu(this, v);
-        //PopupMenu popup = new PopupMenu(this, findViewById(R.id.menu), android.view.Gravity.TOP|android.view.Gravity.RIGHT);
-        // PopupMenu popup = new PopupMenu(this, findViewById(R.id.header_bar));
-        // popup.setGravity(android.view.Gravity.BOTTOM|android.view.Gravity.RIGHT);
         PopupMenu popup = new PopupMenu(this, findViewById(R.id.header_bar), Gravity.BOTTOM|Gravity.RIGHT);
         popup.inflate(R.menu.menu);
         popup.show();
