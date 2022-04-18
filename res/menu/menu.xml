@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
   <item
-      android:id="@+id/menu_test"
-      android:title="Test"
+      android:id="@+id/revert"
+      android:title="Revert buffer"
   />
   <item
-      android:id="@+id/menu_test2"
-      android:title="Test 2"
+      android:id="@+id/top"
+      android:title="Scroll to top"
+  />
+  <item
+      android:id="@+id/bottom"
+      android:title="Scroll to bottom"
   />
 </menu>

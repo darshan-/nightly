@@ -36,6 +36,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.PopupMenu;
+import android.widget.PopupMenu.OnMenuItemClickListener;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -62,7 +63,7 @@ import java.util.HashMap;
 import java.util.List;
 
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements OnMenuItemClickListener {
     private static final String PREFS = "settings";
     private static final String MEDS = "Meds";
     private static final String NOTES = "Notes";
@@ -79,6 +80,8 @@ public class MainActivity extends Activity {
     private TextWatcher textWatcher;
     private TextView header;
     private ScrollView sv;
+    private PopupMenu popup;
+    private Menu puMenu;
     private boolean modified;
     private String bufName;
     private boolean loaded;
@@ -141,6 +144,25 @@ public class MainActivity extends Activity {
                 editText.setSelection(text.length());
             }
         }
+
+        private void revertBuffer() {
+            if (!modified) return;
+
+            curPos = editText.getSelectionStart();
+            scroll = sv.getScrollY();
+
+            loadingBuffer = true;
+            editText.setText(prefs.getString(bufName + PREF_X_SAVED_TEXT, ""));
+            loadingBuffer = false;
+
+            modified = false;
+
+            setSelection();
+            setHeader();
+
+            editText.requestFocus();
+            sv.scrollTo(0, cur.scroll);
+        }
     }
 
     private Buffer cur, oth;
@@ -166,6 +188,14 @@ public class MainActivity extends Activity {
         if (oth.modified) s += "(✳) ";
 
         header.setText(s + cur.bufName);
+
+        updateMenuItems(); // Lazy, easy approach for now...
+    }
+
+    private void updateMenuItems() {
+        if (puMenu == null) return;
+
+        puMenu.findItem(R.id.revert).setEnabled(cur.modified);
     }
 
     @Override
@@ -252,19 +282,18 @@ public class MainActivity extends Activity {
     }
 
     private void swapBuffer() {
-        long start = System.currentTimeMillis();
         cur.scroll = sv.getScrollY();
         cur.editText.setVisibility(View.GONE);
-        // We're just swapping references, not making new objects or copying data.
+
+        // Note: we're just swapping references, not making new objects or copying data, so this is safe and simple.
         Buffer tmp = cur;
         cur = oth;
         oth = tmp;
+
         cur.editText.setVisibility(View.VISIBLE);
         cur.editText.requestFocus();
         sv.scrollTo(0, cur.scroll);
         setHeader();
-        long now = System.currentTimeMillis();
-        System.out.println("..................... nightly: swapping took " + (now - start) + " ms");
     }
 
     @Override
@@ -300,9 +329,35 @@ public class MainActivity extends Activity {
     }
 
     public void menuClick(android.view.View v) {
-        PopupMenu popup = new PopupMenu(this, findViewById(R.id.header_bar), Gravity.BOTTOM|Gravity.RIGHT);
-        popup.inflate(R.menu.menu);
+        if (popup == null) {
+            popup = new PopupMenu(this, findViewById(R.id.header_bar), Gravity.BOTTOM|Gravity.RIGHT);
+            popup.setOnMenuItemClickListener(this);
+            popup.inflate(R.menu.menu);
+            puMenu = popup.getMenu();
+
+            updateMenuItems();
+        }
+
         popup.show();
+    }
+
+    @Override
+    public boolean onMenuItemClick(MenuItem item) {
+        switch (item.getItemId()) {
+        case R.id.revert:
+            cur.revertBuffer();
+            return true;
+        case R.id.top:
+            //sv.scrollTo(0, 0);
+            cur.editText.setSelection(0);
+            return true;
+        case R.id.bottom:
+            //sv.scrollTo(0, Integer.MAX_VALUE);
+            cur.editText.setSelection(cur.editText.getText().length());
+            return true;
+        default:
+            return false;
+        }
     }
 
     // private void saveFile() {
