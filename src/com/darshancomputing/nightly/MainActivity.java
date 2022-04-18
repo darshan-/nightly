@@ -86,7 +86,9 @@ public class MainActivity extends Activity {
 
     private SharedPreferences prefs;
     private SharedPreferences.Editor editor;
-    private EditText editText;
+    //private EditText editText;
+    //private EditText etMeds, etNotes;
+    private TextWatcher textWatcher;
     private TextView header;
     private ScrollView sv;
     private boolean modified;
@@ -98,9 +100,13 @@ public class MainActivity extends Activity {
         private int curPos, scroll;
         private boolean modified;
         private String text, bufName;
+        private EditText editText;
 
-        private Buffer(String name) {
+        private Buffer(String name, int resId) {
             bufName = name;
+
+            editText = (EditText) findViewById(resId);
+            editText.addTextChangedListener(textWatcher);
 
             curPos = prefs.getInt(bufName + PREF_X_CUR_POS, 0);
             scroll = prefs.getInt(bufName + PREF_X_SCROLL, 0);
@@ -123,13 +129,14 @@ public class MainActivity extends Activity {
             setHeader();
         }
 
+        // Doesn't commit, as the expectation is to be used when putting other things as well.
         private void stash() {
             putState();
 
             if (modified)
                 editor.putString(bufName + PREF_X_TEXT, editText.getText().toString());
 
-            editor.commit();
+            //editor.commit();
         }
 
         private void putState() {
@@ -171,25 +178,48 @@ public class MainActivity extends Activity {
     // private String oText, oBufName;;
 
     private void loadBuffer(Buffer b) {
+        long start = System.currentTimeMillis();
+        long t = start;
+
         loadingBuffer = true;
-        editText.setText(b.text);
+        b.editText.setText(b.text);
         loadingBuffer = false;
 
-        try {
-            editText.setSelection(b.curPos);
-        } catch (Exception e) {
-            editText.setSelection(b.text.length());
-        }
-        editText.requestFocus();
-        sv.scrollTo(0, b.scroll);
+        // setText performance is pretty bad for the large text files I use...
+        // Perhaps we're back to first thought: two EditTexts, one GONE.
+        // We'll still keep track of all the same data for restoring on fresh launch, but swiping should
+        //  be much faster that way?  I think?
 
+        long now = System.currentTimeMillis();
+        log("setting text took " + (now - t) + " ms");
+
+        t = System.currentTimeMillis();
+        try {
+            b.editText.setSelection(b.curPos);
+        } catch (Exception e) {
+            b.editText.setSelection(b.text.length());
+        }
+        now = System.currentTimeMillis();
+        log("setting selection took " + (now - t) + " ms");
+
+        t = System.currentTimeMillis();
+        b.editText.requestFocus();
+        sv.scrollTo(0, b.scroll);
+        now = System.currentTimeMillis();
+        log("requesting focus and scrolling took " + (now - t) + " ms");
+
+        t = System.currentTimeMillis();
         setHeader();
+
+        now = System.currentTimeMillis();
+        log("setting header took " + (now - t) + " ms");
+        log("loadBuffer total took " + (now - start) + " ms");
     }
 
     private void syncToCur() {
-        cur.curPos = editText.getSelectionStart();
+        cur.curPos = cur.editText.getSelectionStart();
         cur.scroll = sv.getScrollY();
-        cur.text = editText.getText().toString();
+        cur.text = cur.editText.getText().toString();
     }
 
     private void setModified(boolean m) {
@@ -229,12 +259,12 @@ public class MainActivity extends Activity {
         w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
         w.setStatusBarColor(0xff000000);
 
-        editText = (EditText) findViewById(R.id.editor);
+        //editText = (EditText) findViewById(R.id.editor);
         //editText.requestFocus();
 
         header = (TextView) findViewById(R.id.header);
 
-        editText.addTextChangedListener(new TextWatcher () {
+        textWatcher = new TextWatcher() {
             @Override
             public void afterTextChanged(android.text.Editable s) {
                 if (!loadingBuffer) setModified(true);
@@ -243,7 +273,7 @@ public class MainActivity extends Activity {
             public void beforeTextChanged(java.lang.CharSequence s, int start, int count, int after){}
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count){}
-        });
+        };
 
         sv = findViewById(R.id.sv);
         sv.setSmoothScrollingEnabled(false);
@@ -284,8 +314,8 @@ public class MainActivity extends Activity {
     private void load() {
         String curBuf = prefs.getString(PREF_CUR_BUF, MEDS);
 
-        Buffer meds = new Buffer(MEDS);
-        Buffer notes = new Buffer(NOTES);
+        Buffer meds = new Buffer(MEDS, R.id.et1);
+        Buffer notes = new Buffer(NOTES, R.id.et2);
 
         if (prefs.getString(PREF_CUR_BUF, MEDS).equals(MEDS)) {
             cur = meds;
@@ -296,6 +326,7 @@ public class MainActivity extends Activity {
         }
 
         loadBuffer(cur);
+        loadBuffer(oth);
     }
 
     private void swapBuffer() {
@@ -308,15 +339,42 @@ public class MainActivity extends Activity {
         // cur.makeActive();
 
         //syncToBuffer(cur); // Grab state from editText and sv
-        syncToCur();
-        cur.stash();
+        //cur.stash();
 
         // We're just swapping references, not making new objects or copying data.
+
+
+        long start = System.currentTimeMillis();
+        // long t = start;
+        //syncToCur();
+        // long now = System.currentTimeMillis();
+        // log("syncToCur took " + (now - t) + " ms");
+
+        // t = System.currentTimeMillis();
+        cur.scroll = sv.getScrollY();
+        cur.editText.setVisibility(View.GONE);
         Buffer tmp = cur;
         cur = oth;
         oth = tmp;
+        cur.editText.setVisibility(View.VISIBLE);
+        cur.editText.requestFocus();
+        sv.scrollTo(0, cur.scroll);
+        setHeader();
 
-        loadBuffer(cur); // Update state from new cur
+
+        
+        // now = System.currentTimeMillis();
+        // log("swapping took " + (now - t) + " ms");
+
+        // t = System.currentTimeMillis();
+        // loadBuffer(cur); // Update state from new cur
+        long now = System.currentTimeMillis();
+        //log("loading cur took " + (now - t) + " ms");
+        log("swapping took " + (now - start) + " ms");
+    }
+
+    private void log(String s) {
+        System.out.println("..................... nightly: " + s);
     }
 
     // private void swapBuffer() {
@@ -357,7 +415,7 @@ public class MainActivity extends Activity {
         // } catch (Exception e) {}
         // sv.scrollTo(0, prefs.getInt(PREF_SCROLL_Y, 0));
 
-        try {editText.setSelection(cur.curPos);} catch (Exception e) {}
+        try {cur.editText.setSelection(cur.curPos);} catch (Exception e) {}
         sv.scrollTo(0, cur.scroll);
 
         loaded = true;
@@ -370,6 +428,7 @@ public class MainActivity extends Activity {
         //syncToBuffer(cur);
         syncToCur();
         cur.stash();
+        oth.stash();
 
         editor.putString(PREF_CUR_BUF, cur.bufName);
         editor.commit();

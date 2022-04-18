@@ -47,8 +47,12 @@
       android:paddingLeft="4dp"
       android:paddingRight="4dp"
   >
+  <FrameLayout
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+  >
     <EditText
-        android:id="@+id/editor"
+        android:id="@+id/et1"
         android:layout_width="fill_parent"
         android:layout_height="fill_parent"
         android:inputType="text|textMultiLine|textNoSuggestions"
@@ -58,5 +62,18 @@
         android:textSize="20dp"
         android:textCursorDrawable="@drawable/cursor"
     />
+    <EditText
+        android:id="@+id/et2"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:inputType="text|textMultiLine|textNoSuggestions"
+        android:background="#000"
+        android:textColor="#ddd"
+        android:typeface="monospace"
+        android:textSize="20dp"
+        android:textCursorDrawable="@drawable/cursor"
+        android:visibility="gone"
+    />
+  </FrameLayout>
   </ScrollView>
 </LinearLayout>
