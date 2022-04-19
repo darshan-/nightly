@@ -16,4 +16,9 @@
       android:id="@+id/export"
       android:title="Export to file..."
   />
+  <!-- `import' is an invalid symbol name... -->
+  <item
+      android:id="@+id/m_import"
+      android:title="Import from file..."
+  />
 </menu>

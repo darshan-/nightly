@@ -76,6 +76,7 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
     private static final String PREF_CUR_BUF = "cur_buf";
 
     private static final int EXPORT_FILE = 1;
+    private static final int IMPORT_FILE = 2;
 
     private SharedPreferences prefs;
     private SharedPreferences.Editor editor;
@@ -87,7 +88,7 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
     private boolean modified;
     private String bufName;
     private boolean loaded;
-    private boolean loadingBuffer;
+    //private boolean loadingBuffer;
 
     private class Buffer {
         private int curPos, scroll;
@@ -99,7 +100,7 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             bufName = name;
 
             editText = (EditText) findViewById(resId);
-            editText.addTextChangedListener(textWatcher);
+            //editText.addTextChangedListener(textWatcher);
 
             curPos = prefs.getInt(bufName + PREF_X_CUR_POS, 0);
             scroll = prefs.getInt(bufName + PREF_X_SCROLL, 0);
@@ -130,7 +131,7 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             putState();
 
             if (modified)
-                editor.putString(bufName + PREF_X_TEXT, editText.getText().toString());
+                editor.putString(bufName + PREF_X_TEXT, text);
         }
 
         private void putState() {
@@ -153,9 +154,14 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             curPos = editText.getSelectionStart();
             scroll = sv.getScrollY();
 
-            loadingBuffer = true;
+            long start = System.currentTimeMillis();
+            //loadingBuffer = true;
+            editText.removeTextChangedListener(textWatcher);
             editText.setText(prefs.getString(bufName + PREF_X_SAVED_TEXT, ""));
-            loadingBuffer = false;
+            editText.addTextChangedListener(textWatcher);
+            //loadingBuffer = false;
+            long now = System.currentTimeMillis();
+            System.out.println("..................... nightly: reverting took " + (now - start) + " ms");
 
             modified = false;
 
@@ -165,17 +171,22 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             editText.requestFocus();
             sv.scrollTo(0, cur.scroll);
         }
+
+        private void load() {
+            long start = System.currentTimeMillis();
+            //loadingBuffer = true;
+            editText.removeTextChangedListener(textWatcher);
+            editText.setText(text);
+            editText.addTextChangedListener(textWatcher);
+            //loadingBuffer = false;
+            long now = System.currentTimeMillis();
+            System.out.println("..................... nightly: loading took " + (now - start) + " ms");
+
+            setSelection();
+        }
     }
 
     private Buffer cur, oth;
-
-    private void loadBuffer(Buffer b) {
-        loadingBuffer = true;
-        b.editText.setText(b.text);
-        loadingBuffer = false;
-
-        b.setSelection();
-    }
 
     private void setModified(boolean m) {
         cur.modified = m;
@@ -198,11 +209,16 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
         if (puMenu == null) return;
 
         puMenu.findItem(R.id.revert).setEnabled(cur.modified);
+
         // If buffer is modified, does user want to export modified buffer, or saved version?
         // Rather than picking a default or asking the user, I think it's cleanest and simplest to say:
         //   exporting is only available when the buffer is saved.  Feels right and reasonable to me,
         //   at least for right now.
         puMenu.findItem(R.id.export).setEnabled(!cur.modified);
+
+        // Similarly, rather than prompt user if they're sure, just have them indicate sureness by clearing
+        //   (select all following by backspace, for example) and saving buffer.  Then clearly safe to load file.
+        puMenu.findItem(R.id.m_import).setEnabled(!cur.modified && cur.editText.getText().toString().length() == 0);
     }
 
     @Override
@@ -224,7 +240,8 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
         textWatcher = new TextWatcher() {
             @Override
             public void afterTextChanged(android.text.Editable s) {
-                if (!loadingBuffer) setModified(true);
+                setModified(true);
+                //if (!loadingBuffer) setModified(true);
             }
             @Override
             public void beforeTextChanged(java.lang.CharSequence s, int start, int count, int after){}
@@ -278,8 +295,8 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             oth = meds;
         }
 
-        loadBuffer(oth);
-        loadBuffer(cur);
+        oth.load();
+        cur.load();
 
         cur.editText.setVisibility(View.VISIBLE);
 
@@ -362,85 +379,68 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             //sv.scrollTo(0, Integer.MAX_VALUE);
             cur.editText.setSelection(cur.editText.getText().length());
             return true;
-        case R.id.export:
+        case R.id.export: {
             Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             intent.setType("text/plain");
             intent.putExtra(Intent.EXTRA_TITLE, cur.bufName + ".txt");
 
             startActivityForResult(intent, EXPORT_FILE);
-        default:
+        } case R.id.m_import: {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("text/plain");
+
+            startActivityForResult(intent, IMPORT_FILE);
+          } default:
             return false;
         }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode != EXPORT_FILE)
-            return;
-
         if (data == null) {
             // User cancelled / backed out, rather than selecting a location.
             // I think doing nothing is the most user-friendly / expected thing.
             return;
         }
 
-        try {
-            Uri uri = data.getData();
-            //File f = new File(uri);
-            OutputStream os = getContentResolver().openOutputStream(uri);
-            //FileOutputStream fos = new FileOutputStream(f);
-            //fos.write(editText.getText().toString().getBytes());
-            //fos.close();
-            os.write(cur.editText.getText().toString().getBytes());
-            os.flush();
-            os.close();
-        } catch (Exception e) {
-            Toast.makeText(this, "Error writing file!", Toast.LENGTH_SHORT).show();
+        if (requestCode == EXPORT_FILE) {
+            try {
+                Uri uri = data.getData();
+                OutputStream os = getContentResolver().openOutputStream(uri);
+
+                os.write(cur.editText.getText().toString().getBytes());
+                os.flush();
+                os.close();
+            } catch (Exception e) {
+                Toast.makeText(this, "Error reading file!", Toast.LENGTH_SHORT).show();
+            }
+        } else if (requestCode == IMPORT_FILE) {
+            try {
+                Uri uri = data.getData();
+                InputStream is = getContentResolver().openInputStream(uri);
+
+                ByteArrayOutputStream result = new ByteArrayOutputStream();
+                byte[] buf = new byte[1024];
+                int len;
+
+                while ((len = is.read(buf)) != -1) {
+                    result.write(buf, 0, len);
+                }
+
+                String s = result.toString("UTF-8");
+                cur.text = s;
+                cur.load();
+                // I like it this way, so user can save or revert, rather than saving immediately here
+                setModified(true);
+
+                is.close();
+            } catch (Exception e) {
+                Toast.makeText(this, "Error writing file!", Toast.LENGTH_SHORT).show();
+            }
         }
     }
-
-    // private void saveFile() {
-    //     //saveFile(bufName);
-    //     //setModified(false);
-    // }
-
-    // private void loadFiles() {
-    //     // Load secondary first, so we're done after swapping and loading primary (TODO: keep track of which is open)
-    //     loadFile(NOTES);
-    //     swapBuffer();
-    //     loadFile(MEDS);
-    //     setHeader();
-    // }
-
-    // private void stashBuffer() {
-    //     saveFile(bufName + "~");
-    // }
-
-    // private void restoreStashedBuffer() {
-    //     if (loadFile(STASH)) {
-    //         removeStashFile();
-    //         setModified(true);
-    //     } else {
-    //         loadFile();
-    //     }
-    // }
-
-    // private void removeStashFile() {
-    //     File f = new File(getFilesDir(), STASH);
-    //     f.delete();
-    // }
-
-    // private void saveFile(String fname) {
-    //     try {
-    //         FileOutputStream fos = openFileOutput(fname, 0);
-    //         fos.write(editText.getText().toString().getBytes());
-    //     } catch (FileNotFoundException e) {
-    //         Toast.makeText(this, "File not found!", Toast.LENGTH_SHORT).show();
-    //     } catch (Exception e) {
-    //         Toast.makeText(this, "Error writing file!", Toast.LENGTH_SHORT).show();
-    //     }
-    // }
 
     // private boolean loadFile(String fname) {
     //     try {
