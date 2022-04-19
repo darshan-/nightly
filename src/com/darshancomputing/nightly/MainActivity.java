@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2017-2022 Darshan Computing, LLC
+    Copyright (c) 2010-2022 Darshan Computing, LLC
 */
 
 package com.darshancomputing.nightly;
@@ -74,6 +74,8 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
     private static final String PREF_X_SAVED_TEXT = "_saved_text";
     private static final String PREF_X_TEXT = "_text";
     private static final String PREF_CUR_BUF = "cur_buf";
+
+    private static final int EXPORT_FILE = 1;
 
     private SharedPreferences prefs;
     private SharedPreferences.Editor editor;
@@ -196,6 +198,11 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
         if (puMenu == null) return;
 
         puMenu.findItem(R.id.revert).setEnabled(cur.modified);
+        // If buffer is modified, does user want to export modified buffer, or saved version?
+        // Rather than picking a default or asking the user, I think it's cleanest and simplest to say:
+        //   exporting is only available when the buffer is saved.  Feels right and reasonable to me,
+        //   at least for right now.
+        puMenu.findItem(R.id.export).setEnabled(!cur.modified);
     }
 
     @Override
@@ -355,8 +362,41 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             //sv.scrollTo(0, Integer.MAX_VALUE);
             cur.editText.setSelection(cur.editText.getText().length());
             return true;
+        case R.id.export:
+            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("text/plain");
+            intent.putExtra(Intent.EXTRA_TITLE, cur.bufName + ".txt");
+
+            startActivityForResult(intent, EXPORT_FILE);
         default:
             return false;
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode != EXPORT_FILE)
+            return;
+
+        if (data == null) {
+            // User cancelled / backed out, rather than selecting a location.
+            // I think doing nothing is the most user-friendly / expected thing.
+            return;
+        }
+
+        try {
+            Uri uri = data.getData();
+            //File f = new File(uri);
+            OutputStream os = getContentResolver().openOutputStream(uri);
+            //FileOutputStream fos = new FileOutputStream(f);
+            //fos.write(editText.getText().toString().getBytes());
+            //fos.close();
+            os.write(cur.editText.getText().toString().getBytes());
+            os.flush();
+            os.close();
+        } catch (Exception e) {
+            Toast.makeText(this, "Error writing file!", Toast.LENGTH_SHORT).show();
         }
     }
 

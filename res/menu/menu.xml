@@ -12,4 +12,8 @@
       android:id="@+id/bottom"
       android:title="Scroll to bottom"
   />
+  <item
+      android:id="@+id/export"
+      android:title="Export to file..."
+  />
 </menu>
