@@ -155,12 +155,17 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             scroll = sv.getScrollY();
 
             long start = System.currentTimeMillis();
+            String stext = prefs.getString(bufName + PREF_X_SAVED_TEXT, "");
+            long now = System.currentTimeMillis();
+            System.out.println("..................... nightly: getting stext " + (now - start) + " ms");
             //loadingBuffer = true;
             editText.removeTextChangedListener(textWatcher);
-            editText.setText(prefs.getString(bufName + PREF_X_SAVED_TEXT, ""));
+            start = System.currentTimeMillis();
+            editText.setText(stext);
+            now = System.currentTimeMillis();
             editText.addTextChangedListener(textWatcher);
             //loadingBuffer = false;
-            long now = System.currentTimeMillis();
+            // long now = System.currentTimeMillis();
             System.out.println("..................... nightly: reverting took " + (now - start) + " ms");
 
             modified = false;
@@ -278,10 +283,13 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
 
         });
 
+        tstart = System.currentTimeMillis();
         load();
     }
+    long tstart;
 
     private void load() {
+        long start = System.currentTimeMillis();
         String curBuf = prefs.getString(PREF_CUR_BUF, MEDS);
 
         Buffer meds = new Buffer(MEDS, R.id.et1);
@@ -303,6 +311,9 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
         cur.editText.requestFocus();
         sv.scrollTo(0, cur.scroll);
         setHeader();
+        long now = System.currentTimeMillis();
+        System.out.println("..................... nightly: load() took " + (now - start) + " ms");
+
     }
 
     private void swapBuffer() {
@@ -329,6 +340,8 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
         sv.scrollTo(0, cur.scroll);
 
         loaded = true;
+        long now = System.currentTimeMillis();
+        System.out.println("..................... nightly: load start to oWFC finish took " + (now - tstart) + " ms");
     }
 
     @Override
@@ -372,12 +385,15 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             cur.revertBuffer();
             return true;
         case R.id.top:
-            //sv.scrollTo(0, 0);
             cur.editText.setSelection(0);
+            sv.scrollTo(0, 0);
+            //cur.editText.requestFocus();
             return true;
         case R.id.bottom:
-            //sv.scrollTo(0, Integer.MAX_VALUE);
             cur.editText.setSelection(cur.editText.getText().length());
+            sv.scrollTo(0, Integer.MAX_VALUE / 2);
+            //sv.scrollTo(0, 999999999);
+            //cur.editText.requestFocus();
             return true;
         case R.id.export: {
             Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
