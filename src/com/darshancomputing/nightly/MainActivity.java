@@ -155,53 +155,23 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             try {
                 editText.setSelection(curPos);
             } catch (Exception e) {
-                editText.setSelection(text.length());
+                editText.setSelection(0);
             }
         }
 
-        /*
-
-          I feel like theoretically I should be able to keep track of four values:
-            start in buffer, end in buffer, start in saved text, and end in saved text
-          that together could be used with Editable.replace() (getText() returns an Editable)
-          to revert the buffer effeciently.
-
-          It both seems like it should be easy and doesn't seem obvious, at least in my tired state, but
-            I think it might become apparent (and perhaps appear obvious) after a bit of thought.
-
-          I guess it's sort of like a mapping... er, well, saying: everything before X (same value for
-            buffer and saved text) is the same in both and doesn't need to be replaced, and everything
-            after Yb and Ys (typicaly different between buffer and saved text) is also the same and
-            doesn't need to be replaced.
-
-          Which, huh -- so if we just keep track of TWO values: the earliest and latest (lowest and highest
-            indices) characters to be changed in the buffer, the start value will be the same for both, and
-            the end value is for the buffer, and the end value for the saved text is easily calculated from
-            that, right?
-
-         */
         private void revertBuffer() {
             if (!modified) return;
 
             curPos = editText.getSelectionStart();
             scroll = sv.getScrollY();
 
-            long start = System.currentTimeMillis();
             String stext = prefs.getString(bufName + PREF_X_SAVED_TEXT, "");
-            long now = System.currentTimeMillis();
-            System.out.println("..................... nightly: getting stext " + (now - start) + " ms");
-            //loadingBuffer = true;
+            long start = System.currentTimeMillis();
             editText.removeTextChangedListener(textWatcher);
-            start = System.currentTimeMillis();
-            //editText.setText(stext);
             android.text.Editable t = editText.getText();
             t.replace(nUnmodAtStart, t.length() - nUnmodAtEnd, stext, nUnmodAtStart, stext.length() - nUnmodAtEnd);
-            now = System.currentTimeMillis();
-            //editText.setText(cstext);
-            //editText.setText(edText);
             editText.addTextChangedListener(textWatcher);
-            //loadingBuffer = false;
-            // long now = System.currentTimeMillis();
+            long now = System.currentTimeMillis();
             System.out.println("..................... nightly: reverting took " + (now - start) + " ms");
 
             unmodified();
@@ -214,11 +184,9 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
 
         private void load() {
             long start = System.currentTimeMillis();
-            //loadingBuffer = true;
             editText.removeTextChangedListener(textWatcher);
             editText.setText(text);
             editText.addTextChangedListener(textWatcher);
-            //loadingBuffer = false;
             long now = System.currentTimeMillis();
             System.out.println("..................... nightly: loading took " + (now - start) + " ms");
 
@@ -241,13 +209,9 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             if (uae < nUnmodAtEnd)
                 nUnmodAtEnd = uae;
 
+            // Keeping around for now in case I want to highlight for debugging purposes.
             //android.text.style.BackgroundColorSpan what = new android.text.style.BackgroundColorSpan(0xfffeffab);
             //t.setSpan(what, nUnmodAtStart, t.length() - nUnmodAtEnd, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-
-            // I think we want to keep track of length of unmodified string at end of buffer...
-            // So not comparing diffEnd to anything like we just did with diffStart and start.
-            // because if the buffer is much longer or shorter than it was, that's going to clearly be wrong.
-            // So rather than diffEnd, want something like a UndiffEndLength or something...
         }
     }
 
@@ -520,13 +484,7 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
                     result.write(buf, 0, len);
                 }
 
-                String s = result.toString("UTF-8");
-                cur.text = s;
-                cur.load();
-                cur.nUnmodAtStart = 0;
-                cur.nUnmodAtEnd = s.length();
-                // I like it this way, so user can save or revert, rather than saving immediately here
-                setModified(true);
+                cur.editText.setText(result.toString("UTF-8"));
 
                 is.close();
             } catch (Exception e) {
@@ -534,32 +492,4 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             }
         }
     }
-
-    // private boolean loadFile(String fname) {
-    //     try {
-    //         FileInputStream fis = openFileInput(fname);
-    //         ByteArrayOutputStream result = new ByteArrayOutputStream();
-    //         byte[] buf = new byte[1024];
-    //         int len;
-
-    //         while ((len = fis.read(buf)) != -1) {
-    //             result.write(buf, 0, len);
-    //         }
-    //         String s = result.toString("UTF-8");
-    //         editText.setText(s);
-    //         editText.setSelection(s.length());
-    //     } catch (FileNotFoundException e) {
-    //         //Toast.makeText(this, "File not found!", Toast.LENGTH_SHORT).show();
-    //         return false;
-    //     } catch (Exception e) {
-    //         Toast.makeText(this, "Error reading file!", Toast.LENGTH_SHORT).show();
-    //         return false;
-    //     } finally {
-    //         editText.requestFocus();
-    //         bufName = fname;
-    //         modified = false;
-    //     }
-
-    //     return true;
-    // }
 }

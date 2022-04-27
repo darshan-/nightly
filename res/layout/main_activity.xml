@@ -61,7 +61,6 @@
         android:typeface="monospace"
         android:textSize="20dp"
         android:textCursorDrawable="@drawable/cursor"
-        android:minLines="100"
         android:visibility="gone"
     />
     <EditText
@@ -74,7 +73,6 @@
         android:typeface="monospace"
         android:textSize="20dp"
         android:textCursorDrawable="@drawable/cursor"
-        android:minLines="100"
         android:visibility="gone"
     />
   </FrameLayout>
