@@ -163,6 +163,8 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             start = System.currentTimeMillis();
             editText.setText(stext);
             now = System.currentTimeMillis();
+            //editText.setText(cstext);
+            //editText.setText(edText);
             editText.addTextChangedListener(textWatcher);
             //loadingBuffer = false;
             // long now = System.currentTimeMillis();
@@ -258,19 +260,19 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
         sv.setSmoothScrollingEnabled(false);
 
         header.setOnTouchListener(new View.OnTouchListener() {
-            private float lastX;
+            private float downX;
 
             @Override
             public boolean onTouch(View view, MotionEvent e) {
                 int a = e.getActionMasked();
 
                 if (a == MotionEvent.ACTION_DOWN) {
-                    lastX = e.getX();
+                    downX = e.getX();
                     return false;
                 }
 
                 if (a == MotionEvent.ACTION_UP) {
-                    float hDelta = e.getX() - lastX;
+                    float hDelta = e.getX() - downX;
 
                     if (hDelta > 70 || hDelta < -70) {
                         swapBuffer();
@@ -380,6 +382,8 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
 
     @Override
     public boolean onMenuItemClick(MenuItem item) {
+        Intent intent;
+
         switch (item.getItemId()) {
         case R.id.revert:
             cur.revertBuffer();
@@ -387,28 +391,29 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
         case R.id.top:
             cur.editText.setSelection(0);
             sv.scrollTo(0, 0);
-            //cur.editText.requestFocus();
             return true;
         case R.id.bottom:
             cur.editText.setSelection(cur.editText.getText().length());
             sv.scrollTo(0, Integer.MAX_VALUE / 2);
-            //sv.scrollTo(0, 999999999);
-            //cur.editText.requestFocus();
             return true;
-        case R.id.export: {
-            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        case R.id.export:
+            intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             intent.setType("text/plain");
             intent.putExtra(Intent.EXTRA_TITLE, cur.bufName + ".txt");
+            intent.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, Uri.parse("file:///mnt/sdcard/"));
 
             startActivityForResult(intent, EXPORT_FILE);
-        } case R.id.m_import: {
-            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            return true;
+        case R.id.m_import:
+            intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             intent.setType("text/plain");
+            intent.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, Uri.parse("file:///mnt/sdcard/"));
 
             startActivityForResult(intent, IMPORT_FILE);
-          } default:
+            return true;
+        default:
             return false;
         }
     }
@@ -418,6 +423,11 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
         if (data == null) {
             // User cancelled / backed out, rather than selecting a location.
             // I think doing nothing is the most user-friendly / expected thing.
+            return;
+        }
+
+        if (resultCode != Activity.RESULT_OK) {
+            Toast.makeText(this, "Non-okay resultCode!", Toast.LENGTH_SHORT).show();
             return;
         }
 
