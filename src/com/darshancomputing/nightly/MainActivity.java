@@ -71,6 +71,8 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
     private static final String PREF_X_CUR_POS = "_cur_pos";
     private static final String PREF_X_SCROLL = "_scroll";
     private static final String PREF_X_MODIFIED = "_modified";
+    private static final String PREF_X_UNM_S = "_n_unmod_start";
+    private static final String PREF_X_UNM_E = "_n_unmod_end";
     private static final String PREF_X_SAVED_TEXT = "_saved_text";
     private static final String PREF_X_TEXT = "_text";
     private static final String PREF_CUR_BUF = "cur_buf";
@@ -88,13 +90,13 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
     private boolean modified;
     private String bufName;
     private boolean loaded;
-    //private boolean loadingBuffer;
 
     private class Buffer {
         private int curPos, scroll;
         private boolean modified;
         private String text, bufName;
         private EditText editText;
+        private int nUnmodAtStart, nUnmodAtEnd;
 
         private Buffer(String name, int resId) {
             bufName = name;
@@ -105,18 +107,23 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             curPos = prefs.getInt(bufName + PREF_X_CUR_POS, 0);
             scroll = prefs.getInt(bufName + PREF_X_SCROLL, 0);
             modified = prefs.getBoolean(bufName + PREF_X_MODIFIED, false);
-            if (modified)
+            if (modified) {
                 text = prefs.getString(bufName + PREF_X_TEXT, "");
-            else
+                nUnmodAtStart = prefs.getInt(bufName + PREF_X_UNM_S, 0);
+                nUnmodAtEnd = prefs.getInt(bufName + PREF_X_UNM_E, 0);
+            } else {
                 text = prefs.getString(bufName + PREF_X_SAVED_TEXT, "");
+            }
         }
 
         private void save() {
             if (!modified) return;
 
-            modified = false;
+            text = editText.getText().toString();
+
+            unmodified();
             putState();
-            editor.putString(bufName + PREF_X_SAVED_TEXT, editText.getText().toString());
+            editor.putString(bufName + PREF_X_SAVED_TEXT, text);
 
             editor.commit();
 
@@ -138,6 +145,10 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             editor.putInt(bufName + PREF_X_CUR_POS, curPos);
             editor.putInt(bufName + PREF_X_SCROLL, scroll);
             editor.putBoolean(bufName + PREF_X_MODIFIED, modified);
+            if (modified) {
+                editor.putInt(bufName + PREF_X_UNM_S, nUnmodAtStart);
+                editor.putInt(bufName + PREF_X_UNM_E, nUnmodAtEnd);
+            }
         }
 
         private void setSelection() {
@@ -148,6 +159,27 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             }
         }
 
+        /*
+
+          I feel like theoretically I should be able to keep track of four values:
+            start in buffer, end in buffer, start in saved text, and end in saved text
+          that together could be used with Editable.replace() (getText() returns an Editable)
+          to revert the buffer effeciently.
+
+          It both seems like it should be easy and doesn't seem obvious, at least in my tired state, but
+            I think it might become apparent (and perhaps appear obvious) after a bit of thought.
+
+          I guess it's sort of like a mapping... er, well, saying: everything before X (same value for
+            buffer and saved text) is the same in both and doesn't need to be replaced, and everything
+            after Yb and Ys (typicaly different between buffer and saved text) is also the same and
+            doesn't need to be replaced.
+
+          Which, huh -- so if we just keep track of TWO values: the earliest and latest (lowest and highest
+            indices) characters to be changed in the buffer, the start value will be the same for both, and
+            the end value is for the buffer, and the end value for the saved text is easily calculated from
+            that, right?
+
+         */
         private void revertBuffer() {
             if (!modified) return;
 
@@ -161,7 +193,9 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             //loadingBuffer = true;
             editText.removeTextChangedListener(textWatcher);
             start = System.currentTimeMillis();
-            editText.setText(stext);
+            //editText.setText(stext);
+            android.text.Editable t = editText.getText();
+            t.replace(nUnmodAtStart, t.length() - nUnmodAtEnd, stext, nUnmodAtStart, stext.length() - nUnmodAtEnd);
             now = System.currentTimeMillis();
             //editText.setText(cstext);
             //editText.setText(edText);
@@ -170,8 +204,7 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             // long now = System.currentTimeMillis();
             System.out.println("..................... nightly: reverting took " + (now - start) + " ms");
 
-            modified = false;
-
+            unmodified();
             setSelection();
             setHeader();
 
@@ -190,6 +223,31 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             System.out.println("..................... nightly: loading took " + (now - start) + " ms");
 
             setSelection();
+        }
+
+        private void unmodified() {
+            modified = false;
+            nUnmodAtStart = text.length();
+            nUnmodAtEnd = text.length();
+        }
+
+        private void onTextChanged(int start, int oldCount, int newCount) {
+            if (start < nUnmodAtStart)
+                nUnmodAtStart = start;
+
+            android.text.Editable t = editText.getText();
+
+            int uae = t.length() - start - newCount;
+            if (uae < nUnmodAtEnd)
+                nUnmodAtEnd = uae;
+
+            //android.text.style.BackgroundColorSpan what = new android.text.style.BackgroundColorSpan(0xfffeffab);
+            //t.setSpan(what, nUnmodAtStart, t.length() - nUnmodAtEnd, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+            // I think we want to keep track of length of unmodified string at end of buffer...
+            // So not comparing diffEnd to anything like we just did with diffStart and start.
+            // because if the buffer is much longer or shorter than it was, that's going to clearly be wrong.
+            // So rather than diffEnd, want something like a UndiffEndLength or something...
         }
     }
 
@@ -253,7 +311,9 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
             @Override
             public void beforeTextChanged(java.lang.CharSequence s, int start, int count, int after){}
             @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count){}
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                cur.onTextChanged(start, before, count);
+            }
         };
 
         sv = findViewById(R.id.sv);
@@ -463,6 +523,8 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
                 String s = result.toString("UTF-8");
                 cur.text = s;
                 cur.load();
+                cur.nUnmodAtStart = 0;
+                cur.nUnmodAtEnd = s.length();
                 // I like it this way, so user can save or revert, rather than saving immediately here
                 setModified(true);
 
