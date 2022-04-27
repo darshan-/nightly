@@ -385,6 +385,12 @@ public class MainActivity extends Activity implements OnMenuItemClickListener {
         Intent intent;
 
         switch (item.getItemId()) {
+        case R.id.new_section_top:
+            cur.editText.setSelection(0);
+            cur.editText.getText().insert(0, "\n\n\n\n");
+            cur.editText.setSelection(0);
+            sv.scrollTo(0, 0);
+            return true;
         case R.id.revert:
             cur.revertBuffer();
             return true;
